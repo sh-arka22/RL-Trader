@@ -179,3 +179,456 @@ statistics**. That is a look-ahead leak baked into a NeurIPS Datasets & Benchmar
 copy it.
 
 ---
+
+## 5. THE CRITICAL SIDE — reproducibility and validity failures
+
+This section carries equal weight to §1–§4 by design. **The headline conclusion: as of 2026-09-14,
+the published literature supports DRL as a research framework and a conditional benchmark
+competitor — not as a validated source of net trading alpha.**
+
+### 5.1 Documented failures, by failure mode
+
+| Failure mode | Verified instance | Why it matters here |
+|---|---|---|
+| **Statistically meaningless test windows** | FinRL Contest 2023 Task 1: **15 trading days**, then **6 trading days** (`2504.02281v3`, Table 4) | A 15-day Sharpe has ~0.24 years of data. Under the minimum-track-record arithmetic (§5.3) it cannot distinguish SR=9 from SR=0 |
+| **Arithmetic errors in the published table** | Same paper, two explicit footnotes: *"The results of the Sharpe ratio were reported wrongly"* (Table 4) and *"The Rachev ratio of Queen's Gambit are reported wrongly and need further scrutinization"* (Table 6) | The single most-cited FinRL contest number (Sharpe 9.56) is disavowed by its own authors |
+| **Inconsistent metric conventions in one table** | `2504.02281v3` Table 6 mixes annualised Sharpe (Otago Alpha 1.08) with daily Sharpe (PPO-100 0.0671, S&P 500 0.0448) in the same column | Cross-row comparison in that table is invalid |
+| **Winner used paid, non-reproducible data** | Otago Alpha's put-call ratio came from **OptionMetrics via WRDS and a Bloomberg Terminal** | Directly contradicts the master brief's free-data constraint. The best 2025 contest result is not reproducible on free data |
+| **No passive baseline at all** | TradeMaster NeurIPS 2023 Table 2 — 8 algorithms, **zero index rows** | You cannot tell whether TD3's TR 57.15% beat or lost to the Dow over the same years |
+| **Test-set statistics used for normalisation** | TradeMaster: z-score per split, including the test split | Look-ahead leak in a benchmark paper |
+| **Slippage explicitly ignored** | Gort et al. (`2209.05559`) — market-price execution | The most overfitting-aware DRL study found still has no slippage |
+| **Zero transaction costs** | `2501.04421` (distributional RL, natural gas) | Result is untranslatable to equities |
+| **Costs never attributed to reported numbers** | FinRL library paper (`2011.09607`) reports SR 1.10–1.49 without stating which cost setting produced them | Cannot be reproduced or audited |
+| **Instant bar-price fills, no market impact, no order-book, survivorship bias** | **FinRL's own 2026 successor paper, FinRL-X, lists all of these as backtest-to-live distortions** | The maintainers agree the earlier results are distorted |
+| **Single seed / seed count not stated** | `2504.02281v3` does not state seeds. HMM-RL study reports no seeds. Henderson et al. (`1709.06560`) document high across-seed variance in deep RL | A reported policy can be a lucky initialisation |
+| **Evaluation confined to a bull market** | FinRL-Meta test 2020-07→2022-03; FinRL library test 2019-01→2020-09; Contest 2025 test 2019–2023 | A regime result, not an algorithm result |
+| **Ensembles reported as the contribution without an ensemble-only ablation** | FinRL-Podracer (`2111.05188`) | Cannot attribute the 149%/362% return to the ensemble |
+
+### 5.2 The two results that should change RL-Trader's design
+
+**(a) Deflation does not catch leakage.** `arXiv:2608.27734`, experiment E1, 453-stock PIT US
+large-cap universe, design 2017–2021, eval 2022–2025, costs 1 bp commission + 2 bp spread +
+√-impact + 50 bp borrow:
+
+| Arm | Design SR | Eval SR | **DSR** |
+|---|---:|---:|---:|
+| **Look-ahead oracle (tomorrow's return, available today)** | **34.7** | **51.5** | **1.00** |
+| Buy-and-hold (equal-weight) | 1.15 | 0.60 | 0.99 |
+| SPY buy-and-hold | 0.98 | 0.67 | 0.97 |
+| Random floor | 0.06 | −0.09 | 0.46 |
+| Momentum L/S (leakage-safe) | −0.07 | 0.01 | 0.35 |
+
+A deliberately contaminated strategy passes Deflated Sharpe **and** PBO completely. **Deflation
+corrects for *search*, not for a contaminated information set.** The only defence that worked was
+structural: a tool/feature registry whose feature space excludes look-ahead **by construction**.
+→ RL-Trader must build a causal feature registry and a vectorised-vs-stepwise parity oracle
+(the `rl-trader` repo's approach: parity to 1e-10 catches any vectorised path that peeked).
+
+**(b) On a fair, deflated, cost-aware field, nothing active survives.** Same paper, E2 and E3:
+
+| Experiment | Arms | Result |
+|---|---|---|
+| E2 — classic price factors, 9-trial grid | 126-day momentum, low-vol, short-term reversal (market-neutral rank L/S) | **Every active arm DSR ≤ 0.32. PBO = 0.83** (the search itself is flagged overfit). Only equal-weight B&H clears 0.95 (DSR 0.97); SPY sits at 0.94 |
+| E3 — 100 LLM-composed strategies, ledger N=102, PBO=0.01 | Best agent find: RSI × volume z-score, monthly re-rank | Design SR **1.69** → **eval SR 0.18, +4.7% return, DSR 0.86** (fails 0.95). Buy-and-hold eval SR **0.60, +40.8%**. SPY eval SR **0.67, +51.5%** |
+
+The "evaporation curve": the agent's running-best in-sample Sharpe climbed from −0.07 to 1.69 while
+the deflation threshold implied by its own trial count climbed to **1.21** — the search partly
+outran its bar in-sample and still collapsed out of sample.
+
+### 5.3 Multiple testing: the arithmetic RL-Trader must respect
+
+Computed in this session from the Bailey–López de Prado "false strategy" expression
+E[max SR] ≈ σ_SR·[(1−γ)·Z⁻¹(1−1/N) + γ·Z⁻¹(1−1/(Ne))], with γ = Euler–Mascheroni:
+
+| Independent trials N | E[max annual Sharpe] under the **null** (σ_SR = 1) | Min. backtest years to claim a true SR = 1.0 | Min. backtest years to claim a true SR = 0.5 |
+|---:|---:|---:|---:|
+| 5 | 1.19 | 1.4 | 5.7 |
+| 10 | 1.58 | 2.5 | 9.9 |
+| 50 | 2.28 | 5.2 | 20.7 |
+| **100** | **2.53** | **6.4** | **25.6** |
+| 500 | 3.05 | 9.3 | 37.3 |
+| 1 000 | 3.26 | 10.6 | 42.4 |
+| 5 000 | 3.69 | 13.6 | 54.4 |
+
+Read this next to the contest results: **a Sharpe of 2.5 from a 100-configuration search is exactly
+what pure noise produces.** Bailey & López de Prado's own example: 5 years of data supports at most
+**45** independent configurations (E[IS SR]=1, E[OOS SR]=0); 2 years supports **7**.
+
+A realistic RL-Trader sweep (3 algorithms × 4 rewards × 4 look-backs × 5 seeds × ~10 W&B HPO
+samples) is N ≈ 2 400 trials. That implies a null-expected max Sharpe above **3.4**, and it means a
+credible claim of a *true* SR = 0.5 would need **~50 years** of daily data. **You do not have it.**
+The only escapes are: (i) shrink the search and record every trial in a ledger, (ii) target a
+*relative* claim (beat the frozen 5-stock equal-weight basket) rather than an absolute Sharpe, and
+(iii) hold out a genuinely untouched final window.
+
+### 5.4 What fraction of claimed outperformance survives realistic costs?
+
+**There is no published, defensible percentage for DRL specifically.** Reporting one would be false
+precision. What the verified evidence gives instead:
+
+| Evidence | Quantity | Context |
+|---|---|---|
+| Hou, Xue & Zhang — replication of 452 published anomalies | **65% fail** the single-test hurdle with NYSE breakpoints + value weighting; **82% fail** under a multiple-testing hurdle | Published equity anomalies through Dec 2016; costs not modelled; baseline = the original claims |
+| McLean & Pontiff — post-publication decay | **~35% average decay** after publication | Return-decay statistic, not a net-trading result |
+| Capital Fund Management — systematic strategy decay | **25–50% haircut** after size adjustments | Practitioner note; universe/window/cost detail not fully stated |
+| Harvey, Liu & Zhu | A new factor needs **t > 3.0**, not 2.0 | Cross-section of expected returns |
+| `2608.27734` — direct measurement on a cost-aware PIT US large-cap panel | **100% of active strategies rejected** (3 classic factors + 102 agent-discovered); only passive certified | 2022–2025 eval, full cost stack |
+| `2603.29086` — direct cost-model swap | PPO return **20% → 15%**; DDPG margin Sharpe **−2.1 → +0.3**; SAC **−0.5 → −1.2** | NASDAQ-100, 2025 OOS |
+| `2606.00060` — ML Bitcoin, walk-forward, with costs | Formal Sharpe comparisons vs the passive benchmark **do not reject after bootstrap adjustment** | Explicit negative |
+
+**Working assumption for RL-Trader: treat any backtest edge as ~60–80% illusory before you see the
+held-out window, and assume the remainder is competing against a 0.8–1.1 Sharpe passive baseline.**
+
+### 5.5 Reproducibility of RL in general
+
+- Henderson et al., *Deep Reinforcement Learning that Matters* (`1709.06560`): across-trial and
+  across-seed variance is large enough that few-seed comparisons are uninformative.
+- Agarwal et al., *Deep RL at the Edge of the Statistical Precipice* (`2108.13264`, `rliable`):
+  point estimates from a handful of runs change conclusions; use stratified-bootstrap CIs,
+  performance profiles, and the interquartile mean.
+- **Finance makes this strictly worse**: the market sample is short relative to network capacity,
+  rewards are non-stationary, returns are autocorrelated, and a different seed changes the *trade
+  sequence* and therefore the *realised transaction cost*.
+- **No verified financial source publishes a seed-to-seed Sharpe spread.** The one project that
+  does is the independent `rl-trader` null: 5 seeds, band **[−0.637, 0.000]** — i.e. the spread
+  straddles the entire decision boundary. **Report "not publicly established" rather than a number.**
+- Caveat on tooling: `google-research/rliable` is **archived** (last commit 2024-08-12). Vendor it.
+
+---
+
+## 6. Sample efficiency, non-stationarity, and the validation protocol
+
+### 6.1 How much data?
+
+**No verified 2022–2026 paper varies daily training-history length while holding universe, test
+window, costs and baseline fixed.** Any "you need N years" claim is unsupported. What exists:
+
+| Source | Training history | Test window | Note |
+|---|---|---|---|
+| FinRL-Meta | 2009-04-01→2019-06-30 (~10.3 yr) | 2020-07-01→2022-03-31, quarterly rolling | Benchmark split, not an ablation |
+| FinRL Contest 2023 | 2010-07-01→2023-10-24 (3 352 days) | 15 + 6 days | Absurd train:test ratio |
+| FinRL Contest ensemble study | **30-day rolling train**, 5-day val, 5-day test | 2021-01-01→2023-12-01 | 30 days of training is far too short to be credible |
+| `2603.29086` | 2010-01→~2023 (90% of 2010–2026) | **2025 only** | HPO strictly before 2025 |
+| `2608.27734` | design 2017–2021 | **eval 2022–2025 (9 yr for the ETF arm)** | Explicit power argument: t ∝ SR·√years, so 9 years is needed to certify SR ≈ 0.7; **4 years cannot certify a moderate edge at all** |
+
+**Design implication:** with ~12 years of free daily data on 5 names, you can certify a *large*
+edge or a *relative* edge, but you cannot certify a moderate absolute Sharpe. Plan for a
+relative claim.
+
+### 6.2 Non-stationarity and regime handling — the honest negative
+
+The HMM + FinRL Dow-30 study (2010–2025, 80/20 split, **costs not stated, no seeds**):
+
+| Agent | Sharpe with HMM regime state | Sharpe without | Effect |
+|---|---:|---:|---|
+| A2C | 0.75 | 0.71 | small + |
+| DDPG | 0.72 | 0.48 | + |
+| TD3 | 0.62 | 0.44 | + |
+| **PPO** | **−0.26** | **1.03** | **large −** |
+| **SAC** | **0.69** | **0.95** | **−** |
+
+**Adding a regime feature destroyed PPO.** Since PPO is the recommended core, regime augmentation
+must be an isolated, falsifiable arm — not a default. This directly qualifies the master brief's
+EKG hypothesis: *a slower-moving memory layer that reshapes the RL policy's inputs is exactly the
+intervention that broke PPO here.* Build it so it can be ablated out.
+
+### 6.3 Recommended validation protocol for RL-Trader
+
+1. **Point-in-time features only**, enforced by a feature registry. No feature may reference
+   data > t. (`2608.27734` E1 — statistics alone will not save you.)
+2. **Parity oracle**: the vectorised backtester must match a step-by-step env rollout to 1e-10 for
+   any action sequence. Any mismatch = the vectorised path peeked. (`rl-trader`.)
+3. **Purged k-fold with an embargo sized to the label horizon**, then **walk-forward** for the
+   final chronological evaluation. Purge removes training observations whose label interval
+   overlaps the test interval; embargo removes the observations immediately after.
+4. **Combinatorial Purged CV (CPCV)** for model *selection* only. Arian, Norouzi & Seco (2024)
+   report CPCV with lower PBO and a better DSR statistic than K-fold, purged K-fold and
+   walk-forward on synthetic Heston / Merton-jump / drift-burst / regime-switching data plus
+   historical S&P 500 — **but the numeric bias values are behind a paywall and I could not verify
+   them (BLOCKED: ScienceDirect 403, SSRN 403). Treat the CPCV ranking as UNVERIFIED and use CPCV
+   for selection, walk-forward for the headline.**
+5. **Trial ledger**: log every seed, reward, look-back, algorithm and HPO sample. Compute the DSR
+   with `n_trials = #seeds × #HP configs × #rewards × #look-backs`. This is what the `rl-trader`
+   repo does and what `2608.27734` formalises.
+6. **Three-gate verdict, as a pure function** (adopt `rl-trader`'s design verbatim):
+   `rl_beats_baseline = True` only if **all** hold, net of costs:
+   (a) median-seed OOS Sharpe beats the baseline with a **Diebold–Mariano significant** margin;
+   (b) **DSR > 0.95** with the honest trial count; (c) the **across-seed Sharpe lower bound > 0**.
+7. **Costs applied identically in training and evaluation.** Never train cost-free and evaluate
+   with costs.
+8. **≥ 5 seeds**, report the full per-seed equity curves and a stratified-bootstrap CI.
+9. **Retraining cadence is a hyperparameter, not a convention.** FreqAI's documented example is a
+   30-day `train_period_days` / 7-day `backtest_period_days` window moved weekly, plus a
+   `live_retrain_hours` example of 0.5 h. Qlib and TradeMaster publish **no** default cadence.
+   Compare static / expanding / rolling retrain arms on identical forward windows.
+
+---
+
+## 7. What Sharpe is realistically achievable on 5 liquid US large caps, daily bars, free data?
+
+### 7.1 First-party baseline study (computed in this session)
+
+**Method:** `yfinance` 1.7.0, `auto_adjust=True` (split- and dividend-adjusted), downloaded
+2026-09-14; data span 2013-12-02 → **2026-09-11**. Sharpe = annualised mean / annualised σ of daily
+returns. Two baskets: **EW5_div** = AAPL, MSFT, JNJ, JPM, XOM (sector-diverse), daily-rebalanced
+equal weight; **EW5_tech** = AAPL, MSFT, AMZN, GOOGL, NVDA (hindsight mega-tech). `BH5` = buy once,
+never rebalance. Turnover ≈ 0 for BH5; EW5 daily rebalancing is a slight overstatement of a
+zero-cost strategy.
+
+**Window 2015-01-01 → 2026-09-11 (2 940 trading days), rf = 0:**
+
+| Asset / basket | Ann. return | Ann. vol | **Sharpe** | Sortino | Max DD | Calmar |
+|---|---:|---:|---:|---:|---:|---:|
+| **SPY** | 13.76% | 17.56% | **0.82** | 1.01 | −33.7% | 0.41 |
+| QQQ | 18.90% | 21.91% | 0.90 | 1.16 | −35.1% | 0.54 |
+| **EW5_div** (AAPL/MSFT/JNJ/JPM/XOM) | 19.77% | 18.38% | **1.07** | 1.37 | −35.2% | 0.56 |
+| BH5_div (no rebalance) | 19.63% | 20.19% | 0.99 | 1.29 | −32.4% | 0.61 |
+| **EW5_tech** (AAPL/MSFT/AMZN/GOOGL/NVDA) | 35.94% | 26.88% | **1.28** | 1.72 | −41.8% | 0.86 |
+| BH5_tech | 48.64% | 36.70% | 1.26 | 1.78 | −55.3% | 0.88 |
+| AAPL | 25.08% | 28.75% | 0.92 | 1.27 | −38.5% | 0.65 |
+| MSFT | 24.25% | 27.59% | 0.92 | 1.29 | −37.1% | 0.65 |
+| JNJ | 11.35% | 18.35% | 0.68 | 0.91 | −27.4% | 0.41 |
+| JPM | 19.21% | 26.90% | 0.79 | 1.07 | −43.6% | 0.44 |
+| XOM | 9.67% | 27.48% | 0.47 | 0.67 | −61.3% | 0.16 |
+| NVDA | 68.97% | 48.16% | 1.33 | 1.97 | −66.3% | 1.04 |
+
+With **rf = 2%**: SPY **0.71**, EW5_div **0.97**, EW5_tech **1.20**.
+
+**Sub-period Sharpe (rf = 0) — the regime dependence is the whole story:**
+
+| Window | SPY | QQQ | EW5_div | EW5_tech |
+|---|---:|---:|---:|---:|
+| 2015–2019 | 0.88 | 0.98 | 1.11 | 1.56 |
+| 2018–2019 | 0.83 | 0.93 | 1.07 | 1.02 |
+| 2020 | 0.67 | 1.28 | 0.58 | 1.53 |
+| **2022 (bear)** | **−0.71** | **−1.07** | **+0.15** | **−1.00** |
+| 2023 → 2026-09 | 1.41 | 1.46 | 1.78 | 1.79 |
+
+Two honest caveats: (i) **EW5_tech is hindsight-selected** — picking NVDA/AMZN/GOOGL in 2015 was not
+obvious, so 1.28 is a selection-biased upper bound; (ii) **EW5_div's +0.15 in 2022 was carried
+entirely by XOM (+87.9% that year)** — also partly hindsight. A pre-registered 5-name basket should
+be expected nearer SPY, i.e. **0.7–1.0**.
+
+### 7.2 Cost arithmetic — the constraint that decides everything
+
+Annual return drag = 252 × (daily one-way turnover) × (cost in bps):
+
+| Daily one-way turnover | @ 5 bps | @ 10 bps | @ 20 bps |
+|---:|---:|---:|---:|
+| 5% | 0.63%/yr | 1.26%/yr | 2.52%/yr |
+| 10% | 1.26% | 2.52% | 5.04% |
+| 25% | 3.15% | 6.30% | 12.60% |
+| 50% | 6.30% | 12.60% | 25.20% |
+| 100% | 12.60% | 25.20% | **50.40%** |
+
+`2603.29086`'s *non-optimised* TD3 ran **19% daily turnover**. At 10 bps that is **~4.8%/yr** of
+pure drag — and its measured cost was $200k/day on the paper's book. A daily-rebalanced 5-stock
+agent must be held under ~10% daily one-way turnover or costs eat the entire equity risk premium.
+
+### 7.3 Cost model to use (all components verified live, 2026-09-14)
+
+| Component | Value | Source |
+|---|---|---|
+| Online commission, listed US stocks/ETFs | **$0** at Schwab (industry fees still apply) | schwab.com/pricing |
+| SEC Section 31 fee | **$20.60 per $1M of covered sales = 0.206 bps**, effective 2026-04-04 | SEC FY2026 fee-rate advisory |
+| FINRA TAF | Per-share, assessed to the member firm on covered sales; immaterial for liquid large-cap dollar trades | FINRA TAF FAQ |
+| Quoted spread, mega-cap | BIS working paper 1229: aggregated large-cap spreads fell **60 bps (1996) → 13 bps (2023)** across US/Europe/Japan. **Not a 2026 AAPL/MSFT quote.** Model **1–5 bps** one-way crossing and disclose it | bis.org/publ/work1229.pdf |
+| Slippage / impact | `2603.29086` default half-spread **5 bps** plus √-impact vs 21-day ADV; `2608.27734` uses **1 bp commission + 2 bp spread + √-impact + 50 bp/yr borrow** | both papers |
+| **Recommended base case** | **5–12 bps per one-way dollar turnover**; stress at **10–20 bps** | synthesis |
+
+### 7.4 The answer
+
+| Scenario | Net annualised Sharpe | Basis |
+|---|---|---|
+| In-sample / heavily tuned backtest | **> 1 is routine and meaningless** | FinRL reports 1.10–1.49 without cost attribution; `2608.27734` E3 posts design SR 1.69 → eval 0.18 |
+| Cost-aware research backtest, large universe | **0.9–1.1** | `2603.29086` TD3/PPO on NASDAQ-100 under Almgren–Chriss — but that is **100 stocks**, not 5 |
+| **Honest OOS planning range, 5 US large caps, daily bars, free data, 5–12 bps one-way** | **0.0 – 0.6** | Cost sensitivity (`2603.29086`), full rejection under deflation (`2608.27734`), the independent null (`rl-trader`), and the 0.82–1.07 passive bar computed in §7.1 |
+| Exceptional, replication-worthy | 0.6 – 1.0 | Requires a long untouched OOS spanning 2022-style drawdowns |
+| > 1.0 OOS | **Not a reasonable base case** | No verified source demonstrates it for a 5-name daily strategy net of realistic costs |
+
+**Blunt version: the most likely honest outcome is a Sharpe at or below a frozen equal-weight
+basket of the same five stocks (0.8–1.1 over 2015–2026), i.e. the DRL agent adds turnover and model
+risk without adding risk-adjusted return.** Design the project so that *demonstrating this cleanly*
+is a successful outcome.
+
+### 7.5 Free data — verified status, 2026-09-14
+
+| Source | Status | Problem found **in this session** |
+|---|---|---|
+| `yfinance` 1.7.0 | Works | **4 of 11 tickers failed on the first bulk download** (rate-limited) and needed a staggered retry with 12–48 s sleeps. Docs state it is unaffiliated with Yahoo and "for research and education". Must distinguish split-adjusted `Close` from dividend-adjusted `Adj Close` |
+| Stooq | Docs page live (200) | **The CSV download endpoint returned a JS/anti-bot page to an automated request** — not usable as an unattended primary feed |
+| Alpaca free tier | Live | $0/mo, **IEX only**, 15-minute delayed API, 200 calls/min, **30-symbol limit**, 7+ years history. Fine for 5 symbols |
+| Nasdaq Data Link | Live | Free access varies by dataset; not guaranteed for full US equity history |
+| **Survivorship bias** | Unresolved by any free source | None of the above provides a point-in-time, delisted-inclusive US universe. **Freeze the 5 names before the test and disclose the selection bias**, as `2608.27734` does |
+
+---
+
+## 8. Open-source landscape — verified repo status (GitHub API, 2026-09-14)
+
+| Repo | Stars | License | Last commit | Verdict |
+|---|---:|---|---|---|
+| `freqtrade/freqtrade` | 54 370 | GPL-3.0 | **2026-09-14** | Most actively maintained; FreqAI has the only documented retrain cadence |
+| `microsoft/qlib` | 48 551 | MIT | 2026-07-23 | Active; no default cadence published |
+| `nautechsystems/nautilus_trader` | 28 924 | LGPL-3.0 | **2026-09-14** | Active; execution-grade |
+| `AI4Finance-Foundation/FinRL` | 16 282 | MIT | 2026-07-12 | Active; the baseline-replication target |
+| **`tensortrade-org/tensortrade`** | 7 117 | Apache-2.0 | **2026-02-09** | **~7 months stale.** The master brief mandates it as the execution layer — flag this risk |
+| **`TradeMaster-NTU/TradeMaster`** | 3 070 | Apache-2.0 | **2025-06-04** | **~15 months stale.** Use its *numbers*, not its code |
+| `AI4Finance-Foundation/FinRL-Meta` | 1 938 | MIT | 2026-04-02 | Active enough; `2603.29086` extends it |
+| `google-research/rliable` | 878 | Apache-2.0 | 2024-08-12 | **ARCHIVED.** Vendor it |
+| `Open-Finance-Lab/FinRL_Contest_2025` | 66 | — | 2025-10-20 | Winner code + reports |
+| `Open-Finance-Lab/FinRL_Contest_2023` | 51 | — | 2025-01-21 | Winner code + reports |
+| **`TradeMaster-NTU/PRUDEX-Compass`** | 51 | MIT | **2023-06-21** | **Effectively dead.** Re-implement the 6 axes yourself |
+| `FatihHekim0glu/rl-trader` | 0 | MIT | 2026-06-27 | **Best methodological template found.** Copy its parity oracle, seed-lottery, DM test and DSR verdict gates |
+
+---
+
+## 9. Recommendation for RL-Trader's execution core
+
+### 9.1 The decision
+
+| Slot | Choice | Why |
+|---|---|---|
+| **Primary policy** | **PPO** (Stable-Baselines3 / Gymnasium) | Only family with a positive result in *every* verified benchmark family: FinRL Contest ensemble study (SR 1.55 vs DJIA 0.47), FinRL-Meta, FinRL library, and — critically — the cost-realistic `2603.29086` (SR 1.06 → 1.03 under Almgren–Chriss, still beating QQEW). It degrades *gracefully* under cost realism. It is also the FinRL contest reference agent, so baseline replication is direct |
+| **Challenger** | **TD3** | Best in TradeMaster (SR 0.804 of 8) and the **only** agent that *improved* under the Almgren–Chriss impact model (return 15%→18%, SR 0.9→1.1; portfolio-opt env 26%→32%). Must be paired with hard turnover clipping — un-tuned TD3 is the pathological-turnover case |
+| **Third arm (cheap)** | A2C | Wins the one independent hourly DJIA comparison; cheap to run; use as a variance check |
+| **Rejected** | **SAC** | Contradicts the master brief. Worst cost-robustness on record: margin Sharpe **−0.5 → −1.2** under impact modelling; needs HPO to cut turnover 5%→2% and costs 82%. Keep only as an ablation arm |
+| **Rejected** | DDPG, DQN/Rainbow, distributional RL, hierarchical RL | DDPG: margin SR −2.1, loses to DJIA in FinRL-Meta (0.88 vs 1.32). DQN family: loses to BTC buy-and-hold in the one verified table. Distributional: zero-cost, non-equity evidence only. HRL: no qualifying evidence at all |
+| **Ensembles** | **Defer to Stage 2** | FinRL-Meta shows +0.21 Sharpe over DJIA, but the FinRL Contest study shows **Ensemble-1 (1.48) < single PPO (1.55)** and monotone degradation with ensemble size (1.48 → 1.33 → 1.11). Every ensemble member multiplies the trial count in the DSR denominator |
+| **Offline RL / Decision Transformer** | **Defer to Stage 3** | `2411.17900` is the strongest sequence-model result (SR 1.76 ± 0.08) but has **no cost model** and depends on online-DRL expert trajectories you must generate first. Natural fit *after* a working PPO core exists |
+
+### 9.2 Concrete environment specification
+
+- **Action**: 6-dim simplex (softmax over 5 stocks + cash), long-only, no leverage. Convert to
+  share-level trades; **clip each trade to a max fraction of that day's volume**; per-name weight
+  cap ≈ 40%.
+- **Reward**: `log(V_t/V_{t-1}) − λ·Σ|Δw_i|`, costs charged inside the env at 10 bps one-way
+  (stress arms at 5 and 20 bps), applied identically in train and eval.
+- **State**: daily log returns + FinRL's 10-indicator block, look-back pre-registered over
+  {5, 10, 20, 60} and selected on forward validation only. Scalers fitted on train split **only**.
+- **Cost model**: start flat 10 bps; add the Almgren–Chriss/√-impact arm from `2603.29086` (it is
+  released as a FinRL-Meta extension) before believing any result.
+- **Baselines, frozen before any training**: (1) buy-and-hold SPY; (2) buy-and-hold the frozen
+  5-name basket; (3) daily-rebalanced equal weight of the same 5; (4) FinRL's stock PPO agent.
+  Targets to beat, net of identical costs: **SPY 0.82, EW5 ≈ 1.07** (2015-01-01→2026-09-11, rf=0).
+- **Verdict**: the three-gate pure function of §6.3.6.
+
+### 9.3 Where the evidence contradicts the master brief
+
+| Brief assumption | Evidence | Action |
+|---|---|---|
+| "PPO/**SAC** as the fast execution core" | SAC is the least cost-robust agent found (`2603.29086` margin SR −0.5 → −1.2); TradeMaster omits it entirely | **Replace SAC with TD3** |
+| "benchmark against a published RL baseline such as FinRL's PPO agent" | Sound — and FinRL's own PPO **loses to the DJIA** in the FinRL-Meta reproduction (ann. 13.1%, SR 0.99 vs DJIA 19.7%, SR 1.32) | Keep, but expect the baseline itself to lose to the index |
+| "EKG reshapes the RL policy's inputs/reward over time" | The nearest verified analogue — HMM regime state appended to a FinRL agent — **destroyed PPO (1.03 → −0.26)** and hurt SAC | Build the EKG as an **ablatable** input channel with an explicit A/B gate, not a default-on layer |
+| Sentiment signals improve trading | In FinRL Contest 2025's own table, **PPO-DeepSeek 94.43% < PPO-100 204.51%** on the same universe/window | Sentiment must earn its place by ablation |
+| Free data is sufficient | The **winning** 2025 contest entry used OptionMetrics/WRDS + Bloomberg. yfinance rate-limited 4/11 tickers in this session; Stooq's CSV endpoint is bot-blocked | Freeze the 5 tickers, cache raw pulls to disk, add retry + completeness tests |
+| TensorTrade as the execution layer | Last commit **2026-02-09**, ~7 months stale | Accept but pin the version and budget for maintenance; `nautilus_trader` and `freqtrade` are far more active |
+| Implicit: a good backtest Sharpe proves the system works | A leaky oracle scored **DSR 1.00**; 102 searched strategies all failed deflation; PBO 0.83 on a 9-trial factor grid | Ship the **verdict function + trial ledger before the first agent** |
+
+---
+
+## 10. Verification log
+
+All checks performed **2026-09-14**. `verify_arxiv` returns `None` if a paper does not exist;
+every ID below returned a real title. `verify_url` requires HTTP < 400.
+
+| Claim / source | URL | Check | Status |
+|---|---|---|---|
+| FinRL Contests benchmark paper (all contest tables) | https://arxiv.org/abs/2504.02281 · https://arxiv.org/html/2504.02281v3 | verify_arxiv + verify_url + first-party table extraction | **OK 200** |
+| TradeMaster NeurIPS 2023 D&B (Table 2, split protocol) | https://proceedings.neurips.cc/paper_files/paper/2023/file/b8f6f7f2ba4137124ac976286eacb611-Paper-Datasets_and_Benchmarks.pdf | verify_url + first-party PDF extraction | **OK 200** |
+| TradeMaster abstract page | https://proceedings.neurips.cc/paper_files/paper/2023/hash/b8f6f7f2ba4137124ac976286eacb611-Abstract-Datasets_and_Benchmarks.html | verify_url | **OK 200** |
+| FinRL-Meta NeurIPS 2022 D&B (ensemble Table 2) | https://papers.neurips.cc/paper_files/paper/2022/file/0bf54b80686d2c4dc0808c2e98d430f7-Paper-Datasets_and_Benchmarks.pdf | verify_url + first-party PDF extraction | **OK 200** |
+| FinRL-Meta arXiv | https://arxiv.org/abs/2211.03107 | verify_arxiv | **OK** |
+| FinRL-Meta (earlier arXiv) | https://arxiv.org/abs/2112.06753 | verify_arxiv | **OK** |
+| FinRL library paper | https://arxiv.org/abs/2011.09607 · https://ar5iv.labs.arxiv.org/html/2011.09607 | verify_arxiv + verify_url | **OK 200** |
+| FinRL framework paper | https://arxiv.org/abs/2111.09395 | verify_arxiv | **OK** |
+| FinRL-Podracer | https://arxiv.org/abs/2111.05188 | verify_arxiv | **OK** |
+| Realistic Market Impact Modeling (cost-model swap) | https://arxiv.org/abs/2603.29086 · https://arxiv.org/html/2603.29086v1 | verify_arxiv + first-party HTML extraction | **OK 200** |
+| What survives honest evaluation? (leaky oracle, PBO 0.83, E3) | https://arxiv.org/abs/2608.27734 · https://arxiv.org/html/2608.27734v1 | verify_arxiv + first-party HTML extraction | **OK 200** |
+| Gort et al., crypto backtest overfitting | https://arxiv.org/abs/2209.05559 | verify_arxiv | **OK** |
+| Offline DT-LoRA-GPT2 for quantitative trading | https://arxiv.org/abs/2411.17900 | verify_arxiv | **OK** |
+| Independent DRL comparison (hourly DJIA, A2C top) | https://arxiv.org/abs/2407.09557 | verify_arxiv | **OK** |
+| Distributional RL, natural-gas futures (C51) | https://arxiv.org/abs/2501.04421 | verify_arxiv | **OK** |
+| FinRLlama (Contest 2024 Task 2) | https://arxiv.org/abs/2502.01992 | verify_arxiv | **OK** |
+| PRUDEX-Compass | https://arxiv.org/abs/2302.00586 | verify_arxiv | **OK** |
+| FinRL-X (2026, backtest-to-live distortions) | https://arxiv.org/abs/2603.21330 · https://ai4finance.org/FinRL-Paper.pdf | verify_arxiv + verify_url | **OK 200** |
+| Regret-Optimized Portfolio Enhancement (reward ablation) | https://arxiv.org/abs/2502.02619 | verify_arxiv | **OK** |
+| Adaptive and Regime-Aware RL for Portfolio Optimization | https://arxiv.org/abs/2509.14385 | verify_arxiv | **OK** |
+| Attention-Enhanced RL (Dirichlet policy) | https://arxiv.org/abs/2510.06466 | verify_arxiv | **OK** |
+| Portfolio Management using DRL (10-day MA + correlation state) | https://arxiv.org/abs/2405.01604 | verify_arxiv | **OK** |
+| DRL Framework for Diversified Portfolio Mgmt (multi-horizon, Dirichlet+cash) | https://arxiv.org/abs/2605.17307 | verify_arxiv | **OK** |
+| RL Portfolio Allocation with Dynamic Embedding (top-500 US) | https://arxiv.org/abs/2501.17992 | verify_arxiv | **OK** |
+| Comparing Normalization Methods (normalisation can degrade) | https://arxiv.org/abs/2508.03910 | verify_arxiv | **OK** |
+| DRL for Asset Allocation in US Equities (24 stocks) | https://arxiv.org/abs/2010.04404 | verify_arxiv | **OK** |
+| A Risk-Aware RL Reward for Financial Trading | https://arxiv.org/abs/2506.04358 | verify_arxiv | **OK** |
+| Multimodal DRL for Portfolio Optimization | https://arxiv.org/abs/2412.17293 | verify_arxiv | **OK** |
+| RL Framework for Quantitative Trading (cautionary case) | https://arxiv.org/abs/2411.07585 | verify_arxiv | **OK** |
+| RL in Financial Decision Making: Systematic Review | https://arxiv.org/abs/2512.10913 | verify_arxiv | **OK** |
+| A Review of RL in Financial Applications (meta-analysis) | https://arxiv.org/abs/2411.12746 | verify_arxiv | **OK** |
+| ML Bitcoin trading under costs (walk-forward, does not reject) | https://arxiv.org/abs/2606.00060 | verify_arxiv | **OK** |
+| Regime-Based Portfolio Allocation Using HMM and RL | https://arxiv.org/abs/2605.27848 | verify_arxiv | **OK** |
+| Can LLM Investing Strategies Outperform the Market Long Run? | https://arxiv.org/abs/2505.07078 | verify_arxiv | **OK** |
+| Self-Supervised Auxiliary Task Discovery for Stock Trading RL | https://arxiv.org/abs/2608.15841 | verify_arxiv | **OK** |
+| FineFT ensemble RL for futures | https://arxiv.org/abs/2512.23773 | verify_arxiv | **OK** |
+| Pretrained Time-Series Foundation Models for Return Forecasting | https://arxiv.org/abs/2606.27100 | verify_arxiv | **OK** |
+| Deep RL that Matters (seed variance) | https://arxiv.org/abs/1709.06560 | verify_arxiv | **OK** |
+| Deep RL at the Edge of the Statistical Precipice (rliable) | https://arxiv.org/abs/2108.13264 · https://agarwl.github.io/rliable/ | verify_arxiv + verify_url | **OK 200** |
+| Deflated Sharpe Ratio (Bailey & López de Prado) | https://www.davidhbailey.com/dhbpapers/deflated-sharpe.pdf | verify_url | **OK 200** |
+| The Probability of Backtest Overfitting (PBO/CSCV) | https://davidhbailey.com/dhbpapers/backtest-prob.pdf | verify_url | **OK 200** |
+| Pseudo-Mathematics and Financial Charlatanism (MinBTL) | http://www.davidhbailey.com/dhbpapers/backtest-pseudo.pdf | verify_url | **OK 200** |
+| Harvey, Liu & Zhu — t > 3.0 | https://www.nber.org/papers/w20592 | verify_url | **OK 200** |
+| Hou, Xue & Zhang — 65% / 82% anomaly failure | http://global-q.org/uploads/1/2/2/6/122679606/houxuezhang2020rfs.pdf | verify_url | **OK 200** |
+| McLean & Pontiff — ~35% post-publication decay | http://fmg.ac.uk/sites/default/files/2020-08/Jeffrey-Pontiff.pdf | verify_url | **OK 200** |
+| CFM — 25–50% strategy-decay haircut | http://cfm.com/wp-content/uploads/2022/12/312-2021-05-Why-and-how-systematic-strategies-decay.pdf | verify_url | **OK 200** |
+| Chen & Zimmermann — Open Source Asset Pricing | https://www.openassetpricing.com/ | verify_url | **OK 200** |
+| Open Source Cross-Sectional Asset Pricing (FEDS 2021-037) | https://www.federalreserve.gov/econres/feds/files/2021-037pap.pdf | verify_url | **OK 200** |
+| HMM + FinRL Dow-30 regime study (per-agent Sharpe table) | https://www.cloud-conf.net/datasec/2025/proceedings/pdfs/IDS2025-3SVVEmiJ6JbFRviTl4Otnv/966100a067/966100a067.pdf | verify_url + first-party PDF extraction | **OK 200** |
+| FreqAI retrain cadence (30d/7d, live_retrain_hours) | https://www.freqtrade.io/en/stable/freqai-running/ | verify_url | **OK 200** |
+| FinRL Contest 2025 official site | https://open-finance-lab.github.io/FinRL_Contest_2025/ | verify_url | **OK 200** |
+| SecureFinAI Contest 2026 (NOT "FinRL Contest 2026") | https://jinboatus1.github.io/SecureFinAI_Contest_2026/ | verify_url | **OK 200** |
+| Schwab $0 online commission | https://www.schwab.com/pricing | verify_url | **OK 200** |
+| SEC Section 31 fee $20.60/$1M from 2026-04-04 | https://www.sec.gov/rules-regulations/fee-rate-advisories/2026-2 | verify_url | **OK 200** |
+| FINRA Trading Activity Fee FAQ | https://www.finra.org/rules-guidance/guidance/faqs/trading-activity-fee | verify_url | **OK 200** |
+| BIS WP 1229 — large-cap spreads 60 bps (1996) → 13 bps (2023) | https://www.bis.org/publ/work1229.pdf | verify_url | **OK 200** |
+| Alpaca free data tier | https://alpaca.markets/data | verify_url | **OK 200** |
+| yfinance documentation | https://ranaroussi.github.io/yfinance/index.html | verify_url | **OK 200** |
+| Stooq free-data page | https://stooq.com/db/h/ | verify_url | **OK 200** (CSV endpoint bot-blocked in practice) |
+| `AI4Finance-Foundation/FinRL` | https://github.com/AI4Finance-Foundation/FinRL | gh_repo | **OK** 16 282★, MIT, last commit 2026-07-12 |
+| `AI4Finance-Foundation/FinRL-Meta` | https://github.com/AI4Finance-Foundation/FinRL-Meta | gh_repo | **OK** 1 938★, MIT, 2026-04-02 |
+| `TradeMaster-NTU/TradeMaster` | https://github.com/TradeMaster-NTU/TradeMaster | gh_repo | **OK** 3 070★, Apache-2.0, **2025-06-04 (stale)** |
+| `TradeMaster-NTU/PRUDEX-Compass` | https://github.com/TradeMaster-NTU/PRUDEX-Compass | gh_repo | **OK** 51★, MIT, **2023-06-21 (dead)** |
+| `tensortrade-org/tensortrade` | https://github.com/tensortrade-org/tensortrade | gh_repo | **OK** 7 117★, Apache-2.0, **2026-02-09 (stale)** |
+| `microsoft/qlib` | https://github.com/microsoft/qlib | gh_repo | **OK** 48 551★, MIT, 2026-07-23 |
+| `freqtrade/freqtrade` | https://github.com/freqtrade/freqtrade | gh_repo | **OK** 54 370★, GPL-3.0, 2026-09-14 |
+| `nautechsystems/nautilus_trader` | https://github.com/nautechsystems/nautilus_trader | gh_repo | **OK** 28 924★, LGPL-3.0, 2026-09-14 |
+| `google-research/rliable` | https://github.com/google-research/rliable | gh_repo | **OK** 878★, Apache-2.0, **ARCHIVED 2024-08-12** |
+| `Open-Finance-Lab/FinRL_Contest_2025` | https://github.com/Open-Finance-Lab/FinRL_Contest_2025 | gh_repo | **OK** 66★, 2025-10-20 |
+| `Open-Finance-Lab/FinRL_Contest_2023` | https://github.com/Open-Finance-Lab/FinRL_Contest_2023 | gh_repo | **OK** 51★, 2025-01-21 |
+| `FatihHekim0glu/rl-trader` (honest null + verdict gates) | https://github.com/FatihHekim0glu/rl-trader | gh_repo + README read | **OK** 0★, MIT, 2026-06-27 |
+| SPY / mega-cap baseline Sharpe table (§7.1) | yfinance 1.7.0, `auto_adjust=True`, fetched 2026-09-14 | first-party computation | **OK** — raw prices + `baselines.json` saved to `rl_research_state/` |
+
+### 10.1 Sources that FAILED verification — **do not cite these**
+
+| Source | URL | Result |
+|---|---|---|
+| "DRL for Trading — A Critical Survey" (MDPI *Data* 6(11):119) | https://www.mdpi.com/2306-5729/6/11/119 | **BLOCKED — HTTP 403.** Claims about "very few papers model cost+slippage+spread jointly" are therefore **UNVERIFIED** |
+| Arian, Norouzi & Seco — CPCV vs walk-forward comparison | https://www.sciencedirect.com/science/article/pii/S0950705124011110 | **BLOCKED — HTTP 403** |
+| Same, SSRN preprint | https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4686376 | **BLOCKED — HTTP 403.** The CPCV-beats-walk-forward ranking is **UNVERIFIED** |
+| White — A Reality Check for Data Snooping | https://onlinelibrary.wiley.com/doi/10.1111/1468-0262.00152 | **BLOCKED — HTTP 403** |
+| Benchmarking DRL trade execution (J. Pac.-Basin Finance) | https://www.sciencedirect.com/science/article/pii/S0927538X25002136 | **BLOCKED — HTTP 403** |
+| RA-DRL multi-reward study (Int. J. Comput. Intell. Syst.) | http://link.springer.com/article/10.1007/s44196-025-00875-8 | **PARTIAL — HTTP 200 but served a Cloudflare "Client Challenge" page, not the article.** Its Log-vs-DSR-vs-MDD conclusion in §3.1 is **UNVERIFIED at the source** |
+| Hansen — Test for Superior Predictive Ability | https://www.jstor.org/stable/27638834 | **NOT FETCHED** |
+| "FinRL Contest 2026" | — | **DOES NOT EXIST.** The 2026 event is *SecureFinAI Contest 2026*. Do not relabel it |
+
+---
+
+## 11. Open questions for the next research pass
+
+1. No verified source gives a **seed-to-seed Sharpe spread** for a DRL trading agent on real data.
+   RL-Trader should measure and publish its own — it would be a genuine contribution.
+2. No verified source publishes a **look-back-length sweep** with held-out selection.
+3. No verified source publishes a **feature-level ablation** of FinRL's 10-indicator block.
+4. The **CPCV-vs-walk-forward bias comparison is paywalled**; re-attempt through an institutional
+   proxy or reproduce it on synthetic data.
+5. No verified study runs a DRL agent on a **3–10 name** US equity universe with full cost
+   reporting. This is the exact gap RL-Trader occupies — and the reason its result will be novel
+   whether it is positive or null.

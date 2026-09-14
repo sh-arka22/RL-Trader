@@ -331,3 +331,282 @@ and nodes/edges to KuzuDB; the RL agent reads a **materialised as-of view** keye
 *interface*, not the transport**: the RL observation gets a fixed-width vector *derived* from the
 as-of view, so the policy input is a pure function of `(rebalance_ts, graph_snapshot_hash)`.
 Add MCP later only for a human-facing query tool.
+
+---
+
+## Part D — The 5 stocks
+
+### D.1 The evidence base (all measured this session)
+
+Liquidity, volatility and beta: `yfinance` 1.7.0, `auto_adjust=True`, 2018-01-02 → 2026-09-11
+(2,185 sessions). **ADV$** = mean of `AdjClose × Volume` over the last **252 sessions**.
+**Ann. vol** = daily log-return σ over the last 252 sessions × √252. **β** vs SPY over the last
+**756 sessions (≈3 y)**. Chatter: StockTwits public API, 30-message sample per ticker taken
+**2026-09-14 ≈14:05 UTC (US market open)**; `msgs/h` = 30 ÷ (elapsed span of those 30 messages).
+
+| Ticker | ADV$ (252 d, $bn) | Ann. vol | β SPY (3 y) | StockTwits msgs/h | Watchers | Label coverage | NaN since 2018 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **NVDA** | **32.08** | 0.378 | 2.04 | **173.1** | 666,498 | 0.30 | 0.0 |
+| **TSLA** | **26.14** | 0.477 | 2.24 | **66.0** | **1,065,232** | 0.33 | 0.0 |
+| **AAPL** | **13.81** | 0.251 | 1.06 | **74.5** | 993,222 | 0.27 | 0.0 |
+| **META** | **10.74** | 0.395 | 1.43 | **63.5** | 609,268 | 0.27 | 0.0 |
+| **XOM** | 2.43 | 0.256 | **0.21** | **0.5** | 99,644 | 0.30 | 0.0 |
+| MSFT | 13.71 | 0.321 | 0.97 | 29.8 | 548,884 | 0.20 | 0.0 |
+| AMD | 11.54 | **0.705** | 2.26 | 68.1 | 564,207 | 0.43 | 0.0 |
+| AMZN | 11.11 | 0.337 | 1.41 | 14.6 | 702,608 | 0.37 | 0.0 |
+| GOOGL | 10.35 | 0.313 | 1.16 | 54.3 | 229,538 | 0.50 | 0.0 |
+| AVGO | 9.43 | 0.464 | 2.01 | 25.2 | 74,276 | 0.37 | 0.0 |
+| PLTR | 7.26 | 0.592 | 2.12 | 20.0 | 324,855 | 0.47 | **0.316** |
+| LLY | 3.25 | 0.354 | 0.65 | 0.3 | 34,610 | 0.47 | 0.0 |
+| JPM | 2.84 | 0.221 | 0.87 | 0.3 | 98,250 | 0.30 | 0.0 |
+| WMT | 2.68 | 0.260 | 0.39 | 0.4 | 138,924 | 0.30 | 0.0 |
+| UNH | 2.64 | 0.356 | 0.24 | 0.5 | 55,739 | 0.30 | 0.0 |
+| V | 2.42 | 0.220 | 0.63 | 0.1 | 96,652 | 0.27 | 0.0 |
+| JNJ | 1.84 | 0.191 | 0.01 | 0.3 | 49,218 | 0.27 | 0.0 |
+| CVX | 1.69 | 0.234 | 0.34 | 0.4 | 37,105 | 0.33 | 0.0 |
+| HD | 1.45 | 0.253 | 0.72 | 0.3 | 45,908 | 0.30 | 0.0 |
+| PG | 1.39 | 0.198 | 0.11 | 0.1 | 23,559 | 0.13 | 0.0 |
+| *SPY* | 47.53 | 0.128 | 1.00 | — | — | — | 0.0 |
+| *QQQ* | 32.94 | 0.196 | — | — | — | — | 0.0 |
+
+**The finding that shapes everything.** Social chatter spans **three orders of magnitude** across
+US large caps: NVDA 173 msgs/h vs PG 0.1 msgs/h. Names below ~1 msg/h produce **1-5 StockTwits
+messages per trading day**, of which only ~30 % carry a label — i.e. **≈1 labelled message/day**.
+A daily sentiment score from one message is noise, not signal. **The brief's "sector diversity"
+requirement and its "the sentiment agent must have signal" requirement are in direct
+conflict.** This has to be resolved explicitly, not hand-waved.
+
+### D.2 Correlation reasoning
+
+Mean/max pairwise correlation of **daily log returns over the last 756 sessions (≈3 y)**, for
+candidate baskets (lower mean = better diversification for a 5-asset portfolio):
+
+| Basket | Mean pairwise ρ | Max pairwise ρ | Min chatter in basket (msgs/h) | Comment |
+|---|---:|---:|---:|---|
+| **NVDA, TSLA, AAPL, META, XOM** ← **CHOSEN** | **0.219** | 0.432 | 0.5 (XOM) | Best joint solution |
+| NVDA, TSLA, AAPL, META, JPM | 0.324 | 0.432 | 0.3 (JPM) | JPM is both *more correlated* and *less talked about* than XOM |
+| NVDA, TSLA, AAPL, GOOGL, JPM | 0.324 | 0.386 | 0.3 | same problem |
+| NVDA, TSLA, AAPL, AMZN, JPM | 0.340 | 0.441 | 0.3 | AMZN chatter only 14.6/h |
+| NVDA, TSLA, AMD, META, JPM | 0.347 | **0.538** (NVDA-AMD) | 0.3 | AMD duplicates NVDA |
+| NVDA, TSLA, AAPL, AMD, META (max-chatter) | 0.368 | 0.538 | 63.5 | Great chatter, **no diversification at all** |
+| AAPL, MSFT, JPM, XOM, JNJ ("classic diverse") | **0.129** | 0.349 | 0.3 | Best diversification, **sentiment agent starves** |
+| NVDA, AAPL, MSFT, AMZN, GOOGL (brief-style mega-tech) | **0.407** | 0.568 | 14.6 | **Worst** — five correlated bets on one factor |
+
+Chosen-basket correlation matrix (3 y daily log returns):
+
+| | NVDA | TSLA | AAPL | META | XOM |
+|---|---|---|---|---|---|
+| **NVDA** | 1.00 | 0.37 | 0.30 | 0.43 | **−0.04** |
+| **TSLA** | 0.37 | 1.00 | 0.37 | 0.34 | **0.02** |
+| **AAPL** | 0.30 | 0.37 | 1.00 | 0.33 | **0.11** |
+| **META** | 0.43 | 0.34 | 0.33 | 1.00 | **−0.03** |
+| **XOM** | −0.04 | 0.02 | 0.11 | −0.03 | 1.00 |
+
+XOM's correlation with each of the four tech names is **−0.04 to +0.11** — effectively orthogonal.
+It is the only name in the whole 20-ticker candidate set that decorrelates a tech-led basket
+(JPM, the runner-up diversifier, sits at 0.24-0.32). XOM's β to SPY is **0.21** and its
+annualised vol **0.256**, so it also caps basket drawdown.
+
+### D.3 THE 5 STOCKS — decision table
+
+| # | Ticker | Sector (GICS) | Liquidity evidence | Free-data evidence | Chatter evidence | Correlation role | Why it wins |
+|---|---|---|---|---|---|---|---|
+| 1 | **NVDA** | Information Technology — Semiconductors | **ADV$ 32.1 bn** (highest single stock, ~68 % of SPY's own ADV$); vol 0.378; β 2.04 | yfinance 0 NaN 2018-2026; CIK 1045810 in SEC master; 10:1 split 2024-06-10 correctly back-adjusted | **173.1 msgs/h — the single richest sentiment source in US equities**; 666k watchers | Anchor; ρ 0.30-0.43 vs other tech, **−0.04 vs XOM** | Maximum signal + maximum liquidity. If sentiment works anywhere it works here |
+| 2 | **TSLA** | Consumer Discretionary — Automobiles | ADV$ **26.1 bn**; vol 0.477; β 2.24 | yfinance 0 NaN 2018-2026 | 66.0 msgs/h; **1,065,232 watchers — most-watched ticker on StockTwits** | ρ 0.31-0.39 with tech, **0.02 vs XOM** | Retail-narrative-driven by construction — the best test case for a chatter ontology. Different sector from NVDA |
+| 3 | **AAPL** | Information Technology — Hardware | ADV$ 13.8 bn; **vol 0.251, lowest of the four tech names**; β 1.06 | yfinance **11,530 rows back to 1980-12-12**, longest verified history in the set; CIK 320193 | 74.5 msgs/h; 993k watchers | **Lowest tech-tech ρ**: 0.30 vs NVDA, 0.33 vs META | The stabiliser. Long history supports pre-training and regime work; high chatter with low vol |
+| 4 | **META** | Communication Services | ADV$ 10.7 bn; vol 0.395; β 1.43 | yfinance 0 NaN 2018-2026; CIK 1326801 | 63.5 msgs/h; 609k watchers | ρ 0.34 TSLA, 0.33 AAPL, **−0.03 XOM** | Adds a 4th sector with **no loss of chatter**. Beat AMZN (14.6 msgs/h) and GOOGL (229k watchers) on signal density |
+| 5 | **XOM** | Energy | ADV$ 2.43 bn — **still ~$2.4 bn/day, penny-wide spreads**; vol 0.256; **β 0.21** | yfinance 0 NaN 2018-2026 | **0.5 msgs/h — deliberately the lowest** | **ρ −0.04 to +0.11 vs all four tech names** — the only true diversifier available | Two jobs: (a) the only asset that decorrelates the basket; (b) **the sentiment-null control** — if the sentiment agent "helps" XOM, that is evidence of overfitting, not skill |
+
+**Basket summary:** mean pairwise ρ **0.219**, max **0.432**, 5 GICS sectors ≥ 4 distinct,
+combined ADV$ **85.2 bn/day**, combined StockTwits throughput ≈ **378 msgs/h** (needs ~13 of the
+200 hourly requests — 6.5 % of the free budget), **0 % missing data 2018-2026**.
+
+### D.4 Runner-ups and why they lost
+
+| Ticker | Case for | Why it lost |
+|---|---|---|
+| **AMD** | 68.1 msgs/h, vol 0.705 (highest), label coverage 0.43 | **ρ 0.54 with NVDA** — the highest tech-tech pair after AVGO. Adds volatility, not information |
+| **AVGO** | ADV$ 9.4 bn, 25.2 msgs/h | **ρ 0.63 with NVDA** — the single most redundant pair in the candidate set |
+| **MSFT** | ADV$ 13.7 bn (≈AAPL), β 0.97 | Chatter only **29.8 msgs/h** and **label coverage 0.20 (lowest of the tech names)**; ρ 0.53 with AMZN |
+| **AMZN** | 702k watchers, ADV$ 11.1 bn | Actual message flow only **14.6 msgs/h** — watchers ≠ posts; ρ **0.58 with META**, 0.57 with GOOGL |
+| **GOOGL** | Best label coverage of all (**0.50**), 54.3 msgs/h | ρ 0.57 with AMZN, 0.41 with META; only 229k watchers; loses the Comm-Services slot to META on chatter volume |
+| **PLTR** | 20 msgs/h, label coverage 0.47, vol 0.592 | **31.6 % missing data since 2018** (IPO 2020-09-30). Disqualified — it would silently shorten the backtest |
+| **JPM** | Financials diversifier, ADV$ 2.8 bn | Loses to XOM on **both** axes: higher correlation to tech (0.23-0.32 vs −0.04-0.11) and lower chatter (0.3 vs 0.5 msgs/h) |
+| **LLY, UNH, JNJ, WMT, V, PG, HD, CVX** | Sector diversity | Chatter **0.1-0.5 msgs/h** and ADV$ 1.4-3.3 bn. Any two of them would make the sentiment agent a no-op on 40 % of the book |
+
+---
+
+## Decision table 1 — every source, one line each
+
+| Source | Free? | Volume / rate limit | History | Licence | Verdict for RL-Trader |
+|---|---|---|---|---|---|
+| yfinance 1.7.0 | Yes | No published quota; 30 rapid calls OK; raw HTTP = 429 | 46 y (AAPL 1980→2026) | Yahoo personal use | **PRIMARY OHLCV** — cache + hash + freeze |
+| Tiingo free | Yes | 50/h, 1,000/day, 500 sym/mo | 30+ y | Internal Use Only | **FALLBACK** — re-confirm the numbers yourself |
+| Alpaca Basic | Yes | 200 calls/min | since 2016 | broker terms | Cross-check only — **IEX ≈2.5 % of volume** |
+| Massive (ex-Polygon) Basic | Yes | **5 calls/min** | **2 y** | UNVERIFIED | Reject — history too short |
+| Alpha Vantage free | Yes | **25 calls/day** | 25 y raw | adjusted = premium | Reject |
+| Finnhub free | Yes | 60 calls/min | ambiguous | personal | Reject — candles appear paywalled |
+| EODHD free | Yes | **20 calls/day** | **1 y** | personal | Reject |
+| Nasdaq/Sharadar | No | — | 24 y, 10k delisted | paid | Reject on price; **only point-in-time option** |
+| Databento | $125 credit | — | UNVERIFIED | UNVERIFIED | Reject — cost UNVERIFIED |
+| **Stooq** | — | — | — | no commercial | **DEAD** — CSV returns `Access denied` |
+| SEC `company_tickers.json` | **Yes** | none observed | current | public domain | **USE** — security master |
+| SEC EDGAR full-text (`efts.sec.gov`) | **Yes** | UA header required | full archive | public domain | **USE** — event ground truth |
+| **StockTwits public API** | **Yes, no key** | **200 req/h/IP**, 30 msgs/req | live only (cursor walk-back) | unsupported, docs 404 | **USE** — live sentiment backbone; degrade gracefully |
+| **X `counts/all`** | No | **$0.010 per request**, archive to 2006 | 2006→ | commercial | **BUY (~$2-5 total)** — daily mention volume |
+| X `search/*` post text | No | $0.005/post, 3 M/mo cap | 2006→ | commercial | **DO NOT BUY** — $1,250 for one year of 5 tickers |
+| Reddit API (PRAW) | Yes | 100 QPM/OAuth client *(second-hand)* | live | **no ML training** | **USE FOR INFERENCE ONLY** |
+| Arctic Shift | **Yes, no auth** | UNVERIFIED | historical Reddit | UNVERIFIED | **USE** — historical WSB |
+| PullPush.io | No | 429 for agents | — | — | **DEAD** |
+| Bluesky public API | Partial | `searchPosts` → **403** | — | open protocol | Defer — finance chatter volume UNVERIFIED |
+| **GDELT 2.0 DOC API** | **Yes, no key** | not stated | 2015→ | free & open | **USE** — news volume/tone |
+| NewsAPI free | Yes | 100 req/day, **24 h delay**, 1 mo | 1 mo | dev only | Reject — delay is fatal |
+| Kaggle `equinxx/stock-tweets…` | Yes | — | **2021-09→2022-09** | not exposed | Train/validate only — **no 2024-26 overlap** |
+| Kaggle `ankurzing/…financial-news` | Yes | — | 2013-14 era | **CC-BY-NC-SA-3.0** | Pretraining only, **non-commercial** |
+| Kaggle `miguelaenlle/…nlpbacktests` | Yes | — | **2009→2020** | not exposed | Headline pretraining |
+| HF `Zihan1004/FNSPID` | Yes | — | **1999→2023** | **licence conflict** (CC BY 4.0 vs no-commercial) | Largest corpus; resolve licence before use |
+| HF `zeroshot/twitter-financial-news-sentiment` | Yes | 11,931 rows | — | **MIT** | **USE** — clean eval set |
+| HF `TheFinAI/fiqa-sentiment-classification` | Yes | 1,173 rows | — | **MIT** | **USE** — eval |
+| HF `ProsusAI/finbert` | Yes | 5.34 M downloads | — | not stated on card | **USE** — sentiment model |
+
+---
+
+## Contradictions of the master brief (read these before planning)
+
+| # | Brief says | Evidence says | Impact |
+|---|---|---|---|
+| 1 | "free datasets/APIs (e.g. yfinance, **Stooq**, Alpaca's free tier)" | **Stooq CSV is blocked** (`Access denied` after solving its PoW); `pandas-datareader` Stooq reader raises `NotImplementedError` | Replace Stooq with **Tiingo free** in the plan |
+| 2 | "Alpaca's free tier for equities" (implied as an OHLCV source) | Alpaca free = **IEX only ≈ 2.5 % of market volume**; SIP is $99/mo | Never use free Alpaca **volume**; cross-check prices only |
+| 3 | X pay-per-use "capped **2M**/month" | docs.x.com: **3 million** post reads/month | Minor, but the brief is not current |
+| 4 | X access framed as effectively unusable | **Full-archive search (to 2006) is now open to pay-per-use**, and **`Counts: All` is $0.010 per *request***, not per post | A **full-archive daily cashtag-volume series for all 5 tickers costs ≈ $2**. Add it. Still do not buy post text |
+| 5 | "Kaggle's static labeled tweet-sentiment datasets (**~80k tweets**)" as the historical backtest base | The dataset exists (HTTP 200) but covers **2021-09-30 → 2022-09-30 only** (64,479 rows read by deep research vs an "80K+" marketing blurb), and **no free labelled corpus overlaps 2024-2026** | A "historical sentiment backtest" ending in 2026 is **not possible on free data**. Split the claim into *train on static pre-2023* + *forward-collect live from 2026* |
+| 6 | Reddit via PRAW as a data source for the ontology agent | Reddit Data API Terms §2.4 bars using User Content **for ML/AI model training** without rightsholder permission; §3.1 bars "research in excess of rate limits" | **Inference-only** Reddit. Do not fine-tune on it. Document this in the repo |
+| 7 | StockTwits "free tier, self-labeled bullish/bearish" | Endpoint **is** open (200, no key, 200 req/h) — **the brief is right** — but **only ~30 % of messages carry a label**, developer registration is closed and the docs 404 | Keep StockTwits, but treat the labels as sparse and bull-biased, and make the collector failure-tolerant |
+| 8 | Sentiment agent will "inform their decisions" (assumed positive) | 90 M-message StockTwits study: **no unconditional next-day predictability**. WSB study: **no risk-adjusted alpha** at $0 commission. 2026 S&P 100 study: best 1-day Rank IC **0.0143**, **nothing survives Newey-West + FDR** | Re-scope the sentiment agent to **attention/event/disagreement features** and require a **with/without ablation** whose null result is reportable |
+| 9 | Implied "pick liquid large-caps with sector diversity" | Chatter spans **3 orders of magnitude** (NVDA 173/h vs PG 0.1/h). Sector diversity buys **near-zero sentiment signal** on the non-tech names | Accept the trade-off explicitly: 4 high-chatter names + **XOM as diversifier *and* sentiment-null control** |
+
+---
+
+## Verification log
+
+All checks performed **2026-09-14** from this machine. `rt.*` = helpers in `tools/research_tools.py`.
+Rows marked ❌ are **failed checks** — the claim must not be used, or must carry the stated caveat.
+
+### Market data
+
+| # | Claim | URL / target | Check | Result |
+|---|---|---|---|---|
+| 1 | yfinance latest = **1.7.0**, 2026-08-26, Apache-2.0, requires `curl_cffi>=0.15` | `https://pypi.org/pypi/yfinance/json` | GET | ✅ 200 |
+| 2 | `ranaroussi/yfinance` ★25,242, last commit 2026-08-26, not archived | GitHub API | `rt.gh_repo` | ✅ |
+| 3 | 5-ticker daily pull 2015→2026: 2,940×30, 0 % NaN, 2.84 s | `/tmp/ytest/bin/python` | executed | ✅ |
+| 4 | AAPL max history 11,530 rows, 1980-12-12 → 2026-09-14 | same | executed | ✅ |
+| 5 | 30 rapid `Ticker.history()` calls, 30/30 OK in 1.23 s | same | executed | ✅ |
+| 6 | AAPL splits 1987/2000/2005/2014(7:1)/2020(4:1); div $0.27 @2026-08-10 | same | executed | ✅ |
+| 7 | NVDA 2024-06-10 10:1 split back-adjusted in OHLC | same | executed | ✅ |
+| 8 | Raw Yahoo chart endpoint rate-limits plain clients | `query1.finance.yahoo.com/v8/finance/chart/AAPL` | GET (httpx) | ❌ **429** (this is the evidence) |
+| 9 | Stooq CSV blocked behind JS proof-of-work, then `Access denied` | `https://stooq.com/q/d/l/?s=aapl.us&i=d` | GET → solve PoW (n=29,978, 16 ms) → POST `/__verify` (200) → retry | ❌ **`Access denied`** |
+| 10 | Stooq HTML pages still load after PoW | `https://stooq.com/q/?s=aapl.us` | GET | ✅ 200 (234 KB) |
+| 11 | Stooq light-quote CSV gone | `https://stooq.com/q/l/?...&e=csv` | GET | ❌ **404** |
+| 12 | `pandas-datareader` Stooq reader removed | `web.DataReader("AAPL.US","stooq")` | executed | ❌ **`NotImplementedError`** |
+| 13 | Alpaca Basic = free, IEX, since 2016, 200 calls/min, 15-min restriction; ATP $99/mo | `https://docs.alpaca.markets/docs/about-market-data-api.md` | GET | ✅ 200 (updated 2026-07-16) |
+| 14 | "iex … the only feed that can be used without a subscription"; IEX ≈2.5 % of volume | `https://docs.alpaca.markets/docs/historical-stock-data-1.md` | GET | ✅ 200 (updated 2026-02-11) |
+| 15 | `alpacahq/alpaca-py` ★1,504, Apache-2.0, last commit 2026-09-10 | GitHub API | `rt.gh_repo` | ✅ |
+| 16 | **Polygon.io now renders as "Massive"**; Stocks Basic $0 / 5 calls-min / 2 y; Starter $29 / 5 y; Developer $79 / 10 y; Advanced $199 / 20+ y | `https://polygon.io/pricing` (+ `https://massive.com/docs/llms.txt`) | GET + parse | ✅ 200 |
+| 17 | Alpha Vantage free = **25 API requests/day**; premium from $49.99/mo | `https://www.alphavantage.co/premium/` | GET | ✅ 200 |
+| 18 | SEC ticker→CIK master, 797,931 bytes | `https://www.sec.gov/files/company_tickers.json` | GET | ✅ 200 |
+| 19 | SEC EDGAR full-text search open | `https://efts.sec.gov/LATEST/search-index?q=...` | GET | ✅ 200 (JSON, 10,000+ hits) |
+| 20 | Tiingo / Finnhub / Databento / EODHD / Nasdaq numbers | pricing pages | GET | ⚠️ **200 but JS-only shells** — numbers come from the Parallel.ai deep-research run, **second-hand** |
+| 21 | Market stats (ADV$, vol, β, correlations) | yfinance 2018-01-02→2026-09-11, 2,185 sessions | executed, saved `/tmp/mkt.json` | ✅ |
+
+### Social / news
+
+| # | Claim | URL / target | Check | Result |
+|---|---|---|---|---|
+| 22 | X: pay-per-use only, no subscriptions; Posts Read **$0.005/resource**; cap **3 M/month**; `Counts: All` **$0.010/request**; 24 h dedup | `https://docs.x.com/x-api/getting-started/pricing` | GET | ✅ 200 |
+| 23 | X **Full-Archive Search to 2006 available to pay-per-use**; Recent = 7 days | `https://docs.x.com/x-api/posts/search/introduction` | GET | ✅ 200 |
+| 24 | X developer signup flow (console.x.com) | `https://docs.x.com/x-api/getting-started/getting-access` | GET | ✅ 200 |
+| 25 | ~~`developer.x.com/en/products/x-api`~~ | — | GET | ❌ **404** — do not cite |
+| 26 | StockTwits symbol stream open, **no key** | `https://api.stocktwits.com/api/2/streams/symbol/AAPL.json` | GET | ✅ **200**, 91,723 B |
+| 27 | StockTwits trending open | `.../api/2/trending/symbols.json` | GET | ✅ 200 |
+| 28 | StockTwits official docs gone | `https://api.stocktwits.com/developers/docs` | GET | ❌ **404** |
+| 29 | **200 requests/hour per IP, no API key** | `https://raw.githubusercontent.com/stocktwits/stocktwits-mcp/main/README.md` (official StockTwits org) | GET | ✅ 200 |
+| 30 | `stocktwits/stocktwits-mcp` ★4, MIT, last commit 2026-04-21 | GitHub API | `rt.gh_repo` | ✅ |
+| 31 | NVDA 12-page walk = 360 msgs, 10:43→14:08 UTC; 124 bull / 38 bear / 198 unlabelled | live pagination | executed | ✅ |
+| 32 | 20-ticker chatter + watcher snapshot | live | executed | ✅ |
+| 33 | Reddit unauthenticated JSON blocked | `https://www.reddit.com/r/wallstreetbets/new.json` | GET | ❌ **403** |
+| 34 | Reddit Terms §2.4 bars ML/AI training on User Content; §3.1 bars research beyond rate limits | `https://www.redditinc.com/policies/data-api-terms` | GET + text extraction | ✅ 200, clause quoted verbatim |
+| 35 | Reddit **100 QPM** free limit | `https://support.reddithelp.com/hc/en-us/articles/16160319875092` | GET | ❌ **403 Cloudflare** → number is **second-hand**, flagged in text |
+| 36 | `praw-dev/praw` ★4,252, BSD-2-Clause, last commit 2026-09-14 | GitHub API | `rt.gh_repo` | ✅ |
+| 37 | PullPush refuses agents | `https://api.pullpush.io/reddit/search/submission/` | GET | ❌ **429** + explicit refusal message |
+| 38 | Arctic Shift works, no auth | `https://arctic-shift.photon-reddit.com/api/posts/search` | GET | ✅ **200** JSON |
+| 39 | Bluesky `searchPosts` now needs auth | `https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts` | GET | ❌ **403** |
+| 40 | Bluesky `getProfile` / `getAuthorFeed` open | same host | GET | ✅ 200 |
+| 41 | `bluesky-social/jetstream` ★36, Apache-2.0, last commit 2026-09-04 | GitHub API | `rt.gh_repo` | ✅ |
+| 42 | GDELT DOC API free, keyless, returns 2026 articles | `https://api.gdeltproject.org/api/v2/doc/doc?...` | GET | ✅ 200 |
+
+### Datasets
+
+| # | Target | Check | Result |
+|---|---|---|---|
+| 43 | Kaggle `equinxx/stock-tweets-for-sentiment-analysis-and-prediction` | GET (plain UA) | ✅ 200 — "80K+ tweets … with stock market data" |
+| 44 | Kaggle `ankurzing/sentiment-analysis-for-financial-news` | GET | ✅ 200 — "Sentiment and News Headline" |
+| 45 | Kaggle `miguelaenlle/massive-stock-news-analysis-db-for-nlpbacktests` | GET | ✅ 200 — "~4m articles for 6000 stocks from 2009-2020" |
+| 46 | Kaggle `thedevastator/tweet-sentiment-s-impact-on-stock-returns` | GET | ✅ 200 — "862,231 Labeled Instances" |
+| 47 | Kaggle `gennadiyr/us-equities-market-data` | GET | ❌ **404 — DOES NOT EXIST** |
+| 48 | Kaggle `utkarshx27/stock-market-tweets-data` | GET | ❌ **404 — DOES NOT EXIST** |
+| 49 | HF `Zihan1004/FNSPID` — 6,026 downloads, 122 likes, modified 2024-04-09 | HF API | ✅ 200 |
+| 50 | HF `zeroshot/twitter-financial-news-sentiment` — **11,931 rows, MIT** | HF API + datasets-server | ✅ 200 |
+| 51 | HF `takala/financial_phrasebank` — **CC-BY-NC-SA-3.0** | HF API | ✅ 200 |
+| 52 | HF `TheFinAI/fiqa-sentiment-classification` — **1,173 rows, MIT** | HF API | ✅ 200 |
+| 53 | HF `FinGPT/fingpt-sentiment-train` — **76,772 rows** | HF API | ✅ 200 |
+| 54 | HF `gtfintechlab/finer-ord` — **116,721 rows, CC-BY-NC-4.0** | HF API | ✅ 200 |
+| 55 | HF `chiayewken/aspect-sentiment-financial-news` | HF API | ❌ **401** — do not cite |
+| 56 | HF `BEE-spoke-data/FNSPID_nasdaq_news` | HF API | ❌ **401** — do not cite |
+
+### Models, tools, repos
+
+| # | Target | Check | Result |
+|---|---|---|---|
+| 57 | HF `ProsusAI/finbert` — **5,336,694 downloads**, 1,241 likes | HF API | ✅ 200 |
+| 58 | HF `yiyanghkust/finbert-tone` — 767,289 downloads | HF API | ✅ 200 |
+| 59 | HF `FinGPT/fingpt-sentiment_llama2-13b_lora` — MIT | HF API | ✅ 200 |
+| 60 | HF `urchade/gliner_multi-v2.1` — Apache-2.0, 32,426 downloads | HF API | ✅ 200 |
+| 61 | HF `Babelscape/rebel-large` — **CC-BY-NC-SA-4.0** | HF API | ✅ 200 |
+| 62 | `ProsusAI/finBERT` ★2,226, Apache-2.0, **last commit 2022-02-01** | `rt.gh_repo` | ✅ (stale) |
+| 63 | `AI4Finance-Foundation/FinGPT` ★21,250, MIT, last commit 2026-09-14 | `rt.gh_repo` | ✅ |
+| 64 | `urchade/GLiNER` ★3,648, Apache-2.0, last commit 2026-09-08 | `rt.gh_repo` | ✅ |
+| 65 | `Babelscape/rebel` ★576, **licence: none**, last commit 2023-11-09 | `rt.gh_repo` | ✅ (stale) |
+| 66 | `microsoft/graphrag` ★35,972, MIT, last commit 2026-08-24 | `rt.gh_repo` | ✅ |
+| 67 | `getzep/graphiti` ★30,866, Apache-2.0, last commit 2026-09-11 | `rt.gh_repo` | ✅ |
+| 68 | `HKUDS/LightRAG` ★39,638, MIT, last commit 2026-09-14 | `rt.gh_repo` | ✅ |
+| 69 | `https://fingpt.io/benchmarks` | `rt.verify_url` | ✅ 200 |
+
+### Papers
+
+| # | arXiv ID / URL | Title returned | Result |
+|---|---|---|---|
+| 70 | **2608.04200** | *From Financial Sentiment Classification to Return Predictability: A QLoRA Benchmark of Large Language Models* | ✅ `rt.verify_arxiv` + `rt.verify_url` 200 |
+| 71 | **2305.12257** | *SEntFiN 1.0: Entity-Aware Sentiment Analysis for Financial News* | ✅ |
+| 72 | **1010.3003** | *Twitter mood predicts the stock market* (Bollen, Mao & Zeng) | ✅ |
+| 73 | **2402.06698** | *FNSPID: A Comprehensive Financial News Dataset in Time Series* | ✅ |
+| 74 | **1908.10063** | *FinBERT: Financial Sentiment Analysis with Pre-trained Language Models* | ✅ |
+| 75 | **2306.06031** | *FinGPT: Open-Source Financial Large Language Models* | ✅ |
+| 76 | **2306.05443** | *PIXIU: A Large Language Model, Instruction Data and Evaluation Benchmark for Finance* | ✅ |
+| 77 | **1810.09936** | *Enhancing Stock Movement Prediction with Adversarial Training* | ✅ |
+| 78 | **2304.07619** | *Can ChatGPT Forecast Stock Price Movements? Return Predictability and Large Language Models* | ✅ |
+| 79 | **2311.08545** | *Efficient Continual Pre-training for Building Domain Specific Large Language Models* | ✅ |
+| 80 | `link.springer.com/article/10.1007/s42521-023-00102-z` (90 M StockTwits) | bot-challenge page returned | ⚠️ HTTP 200 but title = "Client Challenge" — **existence confirmed, content second-hand** |
+| 81 | `link.springer.com/article/10.1007/s11408-022-00415-w` (WSB) | same | ⚠️ HTTP 200, same caveat |
+| 82 | `academic.oup.com/rfs/article-abstract/27/5/1367/1581938` (Chen et al. 2014) | Cloudflare | ❌ **403** — cite **DOI 10.1093/rfs/hhu001**; effect sizes are **second-hand from deep research** |
+| 83 | `publications.aaahq.org/...Can-Twitter-Help-Predict...` (Bartov et al. 2018) | Cloudflare | ❌ **403** — second-hand |
+| 84 | `onlinelibrary.wiley.com/doi/abs/10.1111/jofi.12852` (Cookson & Niessner 2020) | Cloudflare | ❌ **403** — second-hand, **no numeric effect size claimed** |
+| 85 | `sciencedirect.com/science/article/pii/S187775031100007X` (Bollen JoCS version) | ScienceDirect block | ❌ **403** — use the verified arXiv version (**1010.3003**) instead |
+| 86 | Renault (2017) JBF 84 | RePEc listing only | ⚠️ **effect size UNVERIFIED — do not quote a number** |
+
+### Budget used
+
+5 Parallel.ai `pro` deep-research runs (**$0.50**) · 6 `psearch` calls (**≈$0.02**) · ~120 direct
+HTTP probes · 1 throwaway venv. Well inside the 40-psearch / 5-run cap.
+
+**Raw deep-research reports retained:** `/tmp/A_market.md`, `/tmp/B_social.md`,
+`/tmp/B_datasets.md`, `/tmp/C_models.md`, `/tmp/C_ontology.md`, `/tmp/mkt.json`.
