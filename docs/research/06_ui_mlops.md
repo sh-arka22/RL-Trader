@@ -172,3 +172,269 @@ slow):
 typed-array buffers on the JS side (grow by doubling), write new entries into the tail, preserve
 the existing prefix (which preserves node positions), and re-submit. Budget a day for this buffer
 manager. This is the single non-obvious engineering cost of the primary pick.
+
+---
+
+## Part B — Streaming transport and backend
+
+### B.1 Transport comparison
+
+Measured evidence. `suenot/trading-ipc-bench` (verified 200 OK; updated **2026-03-04 22:45 UTC**;
+GitHub Actions `ubuntu-latest`; 1,000 discarded warm-ups; 100,000 round trips per transport; each
+transport isolated in a subprocess; `time.perf_counter_ns()`). **64-byte message, loopback,
+Python, round-trip**:
+
+| Transport | p50 µs | p95 µs | p99 µs | p99.9 µs | msg/s |
+|---|---:|---:|---:|---:|---:|
+| Unix domain socket | 20.2 | 31.1 | 42.6 | 65.5 | 46,512 |
+| TCP | 41.7 | 54.6 | 67.2 | 78.0 | 22,425 |
+| ZeroMQ (TCP) | 137.6 | 158.9 | 170.7 | 186.3 | 7,149 |
+| **WebSocket** | **292.5** | 345.5 | 401.6 | 468.4 | **3,345** |
+| HTTP REST | 296.8 | 366.4 | 385.3 | 419.8 | 3,249 |
+| NATS | 411.4 | 466.6 | 527.2 | 712.4 | 2,394 |
+| Redis Pub/Sub | 513.0 | 569.8 | 617.8 | 809.7 | 1,957 |
+| Redis Streams | 665.9 | 772.4 | 844.2 | 999.5 | 1,491 |
+
+**Context / limits of this number:** loopback only, no CPU model published, no TLS, no browser, no
+serialisation of real payloads. It is a *floor* for "how many individual WebSocket messages per
+second can Python push", not a capacity promise. The correct engineering response is **not** to
+try to send 3,345 messages/s — it is to send **20 batched frames/s** carrying 50–5,000 graph
+mutations each, i.e. 1,000–100,000 logical updates/s at the application level.
+
+**I found no credible apples-to-apples FastAPI vs Starlette vs raw-uvicorn *WebSocket broadcast*
+benchmark.** FastAPI's own benchmarks page is TechEmpower **HTTP** data and must not be relabelled
+as WebSocket throughput. Stated as a gap, not filled with a guess.
+
+### B.2 WebSocket vs SSE vs polling — decision table
+
+| | WebSocket | SSE | Long-poll | Poll |
+|---|---|---|---|---|
+| Direction | full duplex | server→client only | server→client | client pull |
+| Framing | text **or binary** | UTF-8 text only | text | text |
+| Reconnect | **you implement it** | **browser does it**, with `id` + `Last-Event-ID` + `retry` (ms) | you implement | trivial |
+| Connection limit | ~none in practice | **6 per browser+origin on HTTP/1.1**; HTTP/2 raises this to the negotiated max streams (MDN cites 100 default) | same HTTP/1.1 limit | same |
+| Proxy risk | low | **high** — nginx/ingress/LB buffering; needs `X-Accel-Buffering: no`, `Cache-Control: no-cache`, heartbeat comments | medium | none |
+| Client→server commands | yes | no (second HTTP channel needed) | no | n/a |
+| Verdict here | **primary data plane** (graph deltas, controls, pause/resume, ack, snapshot request) | optional read-only status/log lane | compatibility fallback only | fine for a *local single-user* dashboard at ≤1 Hz |
+
+**Where SSE actually wins:** a read-only, low-rate, text lane where the browser's free reconnect
+and `Last-Event-ID` cursor are worth more than binary framing — training phase changes, warnings,
+log lines. **Where WebSocket is required:** anything the client must talk back on — subscribe,
+`request_snapshot`, `set_rate`, `pause_graph`, `ack` — plus binary typed-array batches.
+
+### B.3 Backpressure — the part everyone gets wrong
+
+Verified facts from the `websockets` library documentation:
+
+| Fact | Consequence for this design |
+|---|---|
+| ~**64 KiB per connection** with default compression; ~**14 KiB** with compression disabled | Disable `permessage-deflate` on a LAN; it costs CPU and tail latency on already-packed numeric data |
+| Defaults `max_size = 1 MiB`, `max_queue = 16` → up to **16 MiB** of queued *incoming* frames | Bound your own inbound handling too |
+| `send()` waits only when the write buffer passes the high-water mark; the docs explicitly warn that **large buffers delay backpressure and cause bufferbloat** — higher latency, not higher throughput | Keep buffers small and drop frames instead |
+| The broadcast docs state that a naive serialised loop lets **one slow client block all clients**, and that the built-in broadcast path does **not** apply backpressure per client | Never `for ws in clients: await ws.send(...)` |
+| Starlette's thread pool default is **40 tokens** | A blocking call inside an `async def` endpoint will starve every socket |
+| `encode/broadcaster` — the usual FastAPI pub/sub recommendation — is **ARCHIVED** (last push 2025-04-09, BSD-3) | Do not adopt it. Use an in-process registry (single host) or Redis Streams (multi-host) |
+
+**Required pattern — per-client bounded queue + dedicated sender task + explicit overload policy:**
+
+```python
+@dataclass
+class Client:
+    ws: WebSocket
+    q: asyncio.Queue           # maxsize=4 — NOT unbounded
+    dropped: int = 0
+
+async def sender(c: Client):                 # only this task touches the socket
+    while True:
+        await c.ws.send_bytes(await c.q.get())
+
+def offer(c: Client, frame: bytes, lane: str):
+    try:
+        c.q.put_nowait(frame)
+    except asyncio.QueueFull:
+        c.dropped += 1
+        if lane == "graph":      # conflate: drop oldest, keep newest
+            c.q.get_nowait(); c.q.put_nowait(frame)
+        elif lane == "metrics":  # latest-value-wins
+            pass
+        elif lane == "pnl":      # lossless lane -> resync from ring buffer, never silently drop
+            request_resync(c)
+```
+
+**Per-lane policy (this is the architecture, not the wire protocol):**
+
+| Lane | Rate | Policy on overload | Loss tolerated? |
+|---|---|---|---|
+| `graph` | 20 Hz coalesced frames | drop oldest / conflate by node-id | yes — next frame supersedes |
+| `metrics` | 1–10 Hz | latest-value-wins per metric name | yes |
+| `pnl` | batched ticks, sequence-numbered | never drop — resync from server ring buffer | **no** |
+| `control` | event-driven | never drop | **no** |
+
+### B.4 Serialisation
+
+msgspec's own benchmark (methodology published: ~2020 x86 Linux laptop, CPython 3.11; the authors
+warn tight loops keep caches hot). **Decoding one ~77 MiB JSON file:**
+
+| Library | Decode time | Extra memory |
+|---|---:|---:|
+| msgspec (typed `Struct`) | **176.8 ms** | **67.6 MiB** |
+| msgspec (untyped) | 630.5 ms | 218.3 MiB |
+| orjson | 691.7 ms | 406.3 MiB |
+| stdlib `json` | 868.6 ms | 295.0 MiB |
+| ujson | 1,087.0 ms | 349.1 MiB |
+
+msgspec also reports ~12× faster than Pydantic V2 and ~85× faster than Pydantic V1 on its
+structured encode/decode/validate benchmark. **Takeaway: serialisation becomes the bottleneck
+before the socket does.** Use `msgspec.Struct` server-side. On the wire use **MessagePack**
+(`msgpackr@2.1.0`, MIT, browser side) once measured; start with JSON for debuggability.
+
+**Wire layout must be columnar, not one object per edge:**
+
+```json
+{"v":1,"stream":"graph","kind":"delta","seq":184203,"base_seq":184000,"ts_ns":...,
+ "nodes":{"id":[...],"kind":[...],"x":[...],"y":[...]},
+ "edges":{"src":[...],"dst":[...],"w":[...]},
+ "removed_nodes":[...],"removed_edges":[...]}
+```
+Integer node IDs, `float32` coordinates, strings in a side dictionary sent once. Never repeat a
+label on every edge.
+
+### B.5 Reconnect and resync
+
+Snapshot + delta with per-stream monotonic `seq`:
+1. Client connects with its `last_seq` per stream.
+2. Server replies `hello` with protocol version and the retention window of its ring buffer.
+3. If `last_seq` is still in the ring buffer → replay missing deltas in order.
+4. Else → send a full snapshot, then deltas after it.
+5. Client applies only `seq > last_seq`; duplicates are harmless (make every message idempotent).
+6. Client acks the highest applied `seq`; server disconnects clients that cannot catch up.
+
+Ring buffer = in-memory `deque` for one process; **Redis Streams** for multi-process (append-only,
+random access, consumer groups) — accepting the measured 665.9 µs p50 / 1,491 msg/s loopback cost
+in exchange for replay.
+
+### B.6 Recommended architecture
+
+```
+RL training process (SB3)  --in-process asyncio.Queue-->  aggregator/state store
+   (EKG store, metrics, P&L ring buffer)
+        |
+        v  FastAPI 0.141.1 / Starlette / uvicorn
+   WebSocket /stream  --  per-client bounded queue (maxsize=4)
+                      --  20 Hz coalescing frame pump
+        |
+        v  React + Vite
+   Web Worker decodes + merges  ->  cosmos.gl applies one batch per rAF
+                                ->  uPlot / lightweight-charts append batches
+```
+
+**Capacity target (engineering target, load-test it — not a published benchmark):** 20 frames/s
+per client × 50–5,000 mutations per frame; queue depth 2–4; compression off on LAN.
+**Instrument:** bytes/frame, encode time, send-wait time, queue age (not just length), p50/p95/p99
+end-to-end latency, dropped graph frames, reconnect recovery time, browser main-thread time.
+
+**Internal hop:** in-process `asyncio.Queue` for one host (single-user case → this project).
+Redis Streams only when the trainer and the web server are on different machines and you need
+replay. Kafka is overkill. A SQLite/parquet polling loop is genuinely adequate if the visual
+requirement is one update every few seconds — but it cannot drive a live force graph.
+
+---
+
+## Part C — Charts
+
+### C.1 Comparison (all metadata live 2026-09-14)
+
+| Library | npm version (published) | Licence (registry) | Unpacked | GitHub ★ / last push / latest release / open issues | Live-append API | Performance evidence |
+|---|---|---|---:|---|---|---|
+| **TradingView lightweight-charts** | `5.2.1` (2026-08-12) | **Apache-2.0 + attribution, see C.2** | 3.0 MB | 17,256 ★ · 2026-09-10 · `v5.2.1` 2026-08-12 · 137 issues | `series.update(bar)` per tick; `setData()` for snapshots | Canvas, financial-specific. **No reproducible max-point benchmark found** — `UNVERIFIED` |
+| **uPlot** | `1.6.32` (**2025-03-14**) | MIT | 533 KB | 10,491 ★ · pushed **2026-09-14** · latest release `1.6.32` 2025-03-14 · 150 issues | `setData()` on columnar typed arrays | **Project's own claim**: 166,650-point chart in 25 ms, ~100k points/ms after. Project benchmark, not independent |
+| **Plotly.js** | `4.1.0` (2026-09-08) | MIT | **91.5 MB** | 18,328 ★ · 2026-09-13 · `v4.1.0` 2026-09-08 · **772 issues** | `Plotly.extendTraces` / `Plotly.react` | Plotly docs cite ~1M points for WebGL traces; larger needs server-side aggregation |
+| **Apache ECharts** | `6.1.0` (2026-05-19) | Apache-2.0 | 58.9 MB | 67,315 ★ · 2026-09-14 · `6.1.0` 2026-05-19 · **1,501 issues** | `setOption` (incremental), large-data mode | No single credible max-point number found |
+| **Recharts** | `3.10.1` (2026-07-25) | MIT | 7.3 MB | 27,556 ★ · 2026-09-14 · `v3.10.1` 2026-07-25 · 446 issues | React props re-render (SVG) | Its **own** performance guide tells users with large data / rapid changes to isolate charts and disable animation; issue #1146 "Recharts is slow with large data" is open |
+
+### C.2 ⚠ lightweight-charts licence — the trap
+
+Apache-2.0 here is **not** attribution-free. Quoting the current `README.md` on
+`tradingview/lightweight-charts` master, fetched 2026-09-14:
+
+> "This license requires specifying TradingView as the product creator.
+> You shall add the **"attribution notice" from the NOTICE file and a link to
+> https://www.tradingview.com/** to the page of your website or mobile application that is
+> available to your users."
+
+The `NOTICE` file contains: `TradingView Lightweight Charts™ / Copyright (с) 2025 TradingView, Inc.
+https://www.tradingview.com/`. The library provides a built-in
+`LayoutOptions.attributionLogo` chart option which the docs say satisfies the link requirement.
+
+**Decision:** acceptable — enable `attributionLogo: true` and add the NOTICE text to the app's
+attributions page. If the project ever needs a clean-room, attribution-free chart, **uPlot (MIT)**
+is the drop-in escape.
+
+### C.3 Picks
+
+| Panel | Pick | Why | Fallback |
+|---|---|---|---|
+| **Live P&L / equity vs baseline** | **lightweight-charts 5.2.1** | Purpose-built financial time axis, crosshair, session handling, `series.update()` per tick, small relative to Plotly (3.0 MB vs 91.5 MB unpacked), very active (pushed 2026-09-10) | **uPlot** if the TradingView attribution is unacceptable |
+| **Training / learning curves** | **uPlot 1.6.32** | Smallest bundle (533 KB), columnar typed-array data model matches the wire format from B.4, fastest published point throughput, log axes | **ECharts 6.1.0** if you need heatmaps, parallel coordinates, data-zoom or a broader panel set |
+
+**Avoid Recharts on any hot path** — SVG + declarative re-render. Keep it only for small static
+summary cards. **Avoid Plotly for this app** — 91.5 MB unpacked package for functionality uPlot
+and lightweight-charts already cover.
+
+**Implementation rules:** keep raw ticks in the server ring buffer; downsample the visible range
+(min/max or LTTB) before sending; call the chart's append API **once per animation frame with a
+batch**; never push a tick into React state.
+
+---
+
+## Part D — Build vs buy for the whole UI
+
+### D.1 The acceptance test
+
+The right question is not "can it display 10,000 nodes?" It is: *can it add nodes while the force
+simulation keeps running, hold 30–60 fps on target hardware, avoid resending the whole graph on
+every update, and keep training alive when the browser disconnects?*
+
+### D.2 Matrix (metadata live 2026-09-14)
+
+| Option | Version / ★ / last push | Live 10k+ WebGL force graph? | Curves | Glue-code estimate* | What breaks first |
+|---|---|---|---|---:|---|
+| **React + Vite + FastAPI** | FastAPI `0.141.1`, 102,331 ★, pushed 2026-09-01 | **Yes** — the graph owns its own rAF loop; you control the delta protocol | excellent | 800–2,500 LOC v1; 2,000–6,000 production | your own graph UX, reconnect, buffer manager |
+| **Streamlit** | `1.63.0` (2026-09-01), 45,744 ★, 1,162 issues | **No natively.** `st.fragment(run_every=...)` avoids full reruns, but the model still re-runs Python; a continuous WebGL animation needs a custom component — i.e. you write the React app anyway | good at low rate | 100–400 LOC charts; **+500–2,000 TS** for the graph component | rerun latency, serialisation, session CPU |
+| **streamlit-agraph** | — | **No** — wraps `react-graph-vis`; its own README states it is not working after the agraph 2.0 update | — | low, high replacement risk | maintenance |
+| **Plotly Dash** | `v4.4.1` (2026-07-21), 24,405 ★, 487 issues | **Conditional.** `dcc.Interval` + `extendData` are good for curves; Dash Cytoscape is Cytoscape.js (Canvas) — no WebGL force guarantee. Custom clientside component needed | very good | 250–900 LOC + 600–2,500 for a custom graph component | callback queue; persistent synchronous callbacks share a default 4-worker pool |
+| **HoloViz Panel** | `v1.9.4` (2026-08-17), 5,771 ★, **1,113 issues** | **Yes, conditional** — `JSComponent`/`ReactComponent` ESM escape hatch genuinely lets you host cosmos.gl | good (`stream()` on ColumnDataSource, periodic callbacks) | 300–900 Python + 300–1,500 ESM/React | Bokeh document patching; and you have written a custom frontend anyway |
+| **Gradio** | `6.27.0` (2026-09-11), 43,531 ★ | **No** as a dashboard architecture; possible via a custom component | ok for demos | 100–400 demo; 600–2,000 component | event queue, reconnect semantics |
+| **W&B dashboards** | SDK `v0.30.0` (2026-09-09), 11,247 ★ | **No.** `wandb.Html` logs HTML; Vega-Lite custom charts are interactive — but there is **no native network/force-graph panel** and no documented continuously-connected WebGL runtime | **excellent** (this is its job) | 20–200 LOC | it is a *log store*, not a live socket |
+| **Reflex** | `v0.9.11` (2026-09-11), 28,883 ★ | Yes, conditional — it *is* React + FastAPI + WebSockets | good | 500–1,500 Py + 300–1,500 JS | framework state serialisation vs imperative graph state |
+| **NiceGUI** | `v3.16.0` (2026-08-12), 16,206 ★ | via custom Vue component — same burden | good | similar to Panel | same |
+| **Rerun** | `0.37.2` (2026-09-11), 11,445 ★, Apache-2.0 | Not a force-graph product; it is a streaming *spatial/temporal* viewer | n/a | — | wrong data model for a knowledge graph |
+
+\* Engineering estimates, not vendor figures.
+
+### D.3 Recommendation, and what is lost
+
+**Build: a small custom React + Vite frontend with a FastAPI WebSocket backend. Buy: W&B for
+experiment tracking.**
+
+The justification is not "custom is better". It is that **every** Python-first option that can
+actually render the EKG requires you to write the same WebGL component — Streamlit custom
+component, Dash clientside component, Panel `ReactComponent`, Gradio custom component, NiceGUI Vue
+component. Once you have written it, the Python framework adds a serialisation boundary, a rerun
+model and a second failure mode between your component and your data, and buys you only the parts
+(sliders, layout, tables) that are the cheapest part of a React app. The Python frameworks are
+worth it when the graph is *not* the product; here the graph **is** the headline requirement.
+
+| Alternative not chosen | What is genuinely lost |
+|---|---|
+| Streamlit | ~1 day to a working metrics page; Python-only team could maintain it |
+| Dash | Mature callback model, `extendData`, Dash Cytoscape for small graphs, enterprise support option |
+| Panel | Best Python escape hatch; Datashader for huge static data; keeps everything in one language |
+| Gradio | Fastest path to a shareable public demo link |
+| W&B-only | Zero frontend code; free hosted history, comparison, reports, permissions |
+| Reflex | Same architecture with less boilerplate — **closest runner-up**; rejected only because the graph needs imperative state that fights a reactive Python state model |
+
+**Hybrid (the actual plan):** W&B is the system of record for every run, sweep, config, artifact
+and learning curve. The custom React app renders only (a) the live EKG, (b) live equity vs
+baseline, (c) a live mirror of the current run's learning curve. If the React app dies, no
+experiment data is lost.

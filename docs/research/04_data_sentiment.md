@@ -220,3 +220,114 @@ Consequence for the plan: the sentiment model can be *trained* on static data, b
 today, with **model-free labels** (realised next-day return sign), and a clearly labelled
 "in-sample era / out-of-sample era" split. Any claim of a 10-year sentiment backtest would be a
 fabrication.
+
+---
+
+## Part C — Sentiment models, signal reality, ontology, agent comms
+
+### C.1 Which free sentiment model in 2026
+
+Numbers are only comparable when split + label definition + prompt protocol match; they mostly
+do not. `NR` = the source did not report it.
+
+| Model | Measured result (with protocol) | Size / licence | Throughput / VRAM | Verdict |
+|---|---|---|---|---|
+| **`ProsusAI/finbert`** | SEntFiN (arXiv **2305.12257**) reports **94.29 % acc / 93.27 F1** for the best RoBERTa/FinBERT group — **exact split not exposed**. Downstream: **1-day Rank IC 0.0143** on S&P 100, the *largest* of all models compared (arXiv **2608.04200**) | BERT-base; licence not stated on the card | **NR** — no controlled published throughput | **WINNER for this project.** 5.34 M downloads, encoder not generative, runs on CPU for ~10⁵ short posts |
+| `yiyanghkust/finbert-tone` | **NR / UNVERIFIED** on FPB, FiQA-SA, TFNS, SEntFiN, FOMC | — | NR | Plausible for report tone; no evidence advantage |
+| FinBERT-LSTM variants | **NR** — no apples-to-apples sentiment table | — | NR | Do not pick it because it says "LSTM" |
+| **FinGPT sentiment (Llama2-13B LoRA)** | fingpt.io/benchmarks (live, 200): Instruct-FinGPT **0.76 acc / 0.74 F1** vs GPT-4 **0.64 / 0.51**, Llama-7B **0.60 / 0.40**, BloombergGPT **0.51 F1** — **exact split not reported** | Llama2-13B, **MIT** LoRA | NR | Only if a Llama2 serving stack already exists |
+| FinMA / PIXIU (arXiv **2306.05443**) | Claims to beat BloombergGPT/ChatGPT/GPT-4; **numeric sentiment scores and split not exposed** | FinMA-7B / 30B | NR | Research baseline, not a production winner |
+| **Qwen2.5-7B** | arXiv **2608.04200**: zero-shot macro-F1 **0.7274** → QLoRA **0.8615**; train/val/test proportions **not reported** | 7 B | Authors state peak VRAM was **not logged consistently** | Best open small-LLM route *if* you have labelled in-domain data + a GPU |
+| **Mistral-7B** | Same benchmark: **0.8840 acc / 0.8771 macro-F1** after QLoRA — the strongest measured 2026 result | 7 B | NR | Strongest text metric, far higher cost than FinBERT |
+| Llama-3.x / Gemma small | **NR / UNVERIFIED** on the named splits | — | NR | Do not claim parity |
+| GPT-4o / GPT-5-class APIs | Not free; per-token billing | — | — | Out of scope for a free stack |
+
+**Answer to "do domain models still beat general LLMs in 2026?"** Partly no. The 2026 QLoRA
+benchmark shows a general 7 B model (Mistral) reaching **0.8771 macro-F1** after fine-tuning,
+above the zero-shot domain baselines. But the *same paper* shows FinBERT has the **best downstream
+Rank IC (0.0143)** while Qwen variants sit at ≈0.0083 — i.e. **the better classifier produced the
+worse trading signal.** That is the single most important sentence in this whole section.
+
+**Decision.** `ProsusAI/finbert` in a batched CPU/GPU inference job, scores cached per
+`(message_id, model_version)`. Revisit only if a labelled in-domain holdout of live StockTwits
+posts shows a fine-tuned 7 B beating it on *Rank IC*, not on F1.
+
+### C.2 Does social sentiment actually predict returns? — effect sizes, both sides
+
+| Study | Universe / window | Effect size **with context** | Costs? Out-of-sample? | Verified |
+|---|---|---|---|---|
+| **Bollen, Mao & Zeng (2011)** — arXiv **1010.3003** | DJIA index; **9,853,498 tweets** from ~2.7 M users; train 2008-02-28→11-28, **test 2008-12-01→12-19 (19 days)** | **86.7 % direction accuracy**, 1.83 % MAPE; mood leads DJIA by 3-4 days | **No transaction-cost analysis. 19-day test window.** | arXiv 200 |
+| **Chen, De, Hu & Hwang (2014)**, RFS 27(5) | Seeking Alpha articles + comments, **2005-2012** | Negative-tone coefficients **−0.379 / −0.332 / −0.320** (articles), **−0.194 / −0.196** (comments); long-short **2.6 and 2.4 bp/day** (articles), **2.2 and 1.7 bp/day** (comments); adj R² **1.20-1.24 %** | **No cost analysis, no post-publication OOS.** 2.6 bp/day gross is inside a realistic round-trip cost | Publisher page **403** (Cloudflare) — **cite DOI 10.1093/rfs/hhu001, page not independently loaded** |
+| **Renault (2017)**, JBF 84 | StockTwits, half-hour intervals, S&P 500 ETF | First-half-hour sentiment change predicts last-half-hour return; **coefficient / R² NR** | No cost or OOS evidence in retrieved source | RePEc listing only — **effect size UNVERIFIED** |
+| **Cookson & Niessner (2020)**, JoF | StockTwits disagreement | **NR** — abstract confirms the concept, no coefficient exposed | — | Publisher **403** — **do not convert to a numeric edge** |
+| **Bartov, Faurel & Mohanram (2018)**, TAR 93(3) | Tweets before earnings, **2009-2012** | Aggregate tweet opinion predicts quarterly earnings and announcement returns; **coefficient NR** | No cost/OOS reported | Publisher **403** |
+| **StockTwits classified-sentiment study (2023)**, Digital Finance | **90,000,000 messages**, **2010-01 → 2020-03**, US + Canadian stocks | Daily polarity is associated with **contemporaneous** returns but has **NO unconditional next-day predictive power**. Around 1,000+ message-volume *events*, bullish/bearish spikes align with large abnormal returns that **normalise immediately** | No cost analysis | `link.springer.com/article/10.1007/s42521-023-00102-z` → HTTP 200 (bot-challenge title) |
+| **WallStreetBets / meme study (2022)**, Fin. Mkts. Portf. Mgmt. | WSB-mentioned stocks, early 2021; holds **1 day → 1 year** | **No alpha.** Long-buy/short-sell recommendation strategies are not profitable risk-adjusted. Robust to bid-ask adjustment — **and this assumes $0 commissions** | Zero-commission assumption makes the negative result *stronger* | `link.springer.com/article/10.1007/s11408-022-00415-w` → HTTP 200 |
+| **QLoRA return benchmark (2026)** — arXiv **2608.04200** | **Fixed S&P 100**; 2019 Benzinga headlines: **10,637 unique headlines, 13,115 headline-stock obs**; horizons 1/2/3/5 days | **Best 1-day Rank IC = 0.0143 (FinBERT)**; Qwen ≈0.0083; IC weakens or flips at longer horizons. **None of 28 model-horizon tests survives Newey-West + FDR correction** | Gross only — excludes commission, spread, impact, slippage, borrow | arXiv **200** |
+| **Can ChatGPT Forecast Stock Price Movements?** — arXiv **2304.07619** | Headline-level LLM sentiment | Reports predictability; **not independently re-verified here beyond existence** | — | arXiv **200** |
+
+**Honest verdict.** For **5 liquid US mega-caps at a daily horizon**, the realistic incremental
+predictive power of social sentiment is **approximately zero as a standalone investable
+expectation**. The positive literature is (a) index-level on a 19-day test window (Bollen),
+(b) small-cap/illiquid-tilted with 2 bp/day gross spreads (Chen), (c) intraday (Renault), or
+(d) event-window (Bartov). The two largest and most modern studies — 90 M StockTwits messages and
+the 2026 S&P 100 Rank-IC test — are **negative** for exactly the setting this project is in.
+
+**What to do instead (this is the design instruction).** Treat the sentiment/ontology agent as a
+**state-augmentation and event-detection** module, not an alpha module:
+1. Features = **message volume** and **Δlog volume** (attention), **disagreement** (bull/bear
+   entropy), **event flags** from SEC EDGAR / GDELT — not raw polarity alone.
+2. The EKG's job is to mark **regimes and events**, letting the RL policy change behaviour
+   conditionally — which is what the event studies actually support.
+3. **Mandatory ablation:** train the identical PPO/SAC policy with and without the sentiment
+   channel on identical seeds and identical costs. If the sentiment arm does not beat the
+   price-only arm net of costs, **report that as the result**. Design the harness so a null
+   result is publishable, not a failure.
+
+### C.3 Ontology / KG extraction
+
+| Layer | Tool | Live status | Benchmark evidence | Recommendation |
+|---|---|---|---|---|
+| Ticker → company → CIK | **SEC `company_tickers.json`** | HTTP 200, 797,931 B, free, no key | deterministic | **Use this. It is the spine.** |
+| Cashtag normalisation | regex `\$[A-Z]{1,5}` + securities-master join | — | — | Do **not** send cashtags to a general entity linker |
+| NER (finance) | **GLiNER** `urchade/GLiNER` ★3,648, Apache-2.0, last commit 2026-09-08; `urchade/gliner_multi-v2.1` HF 200, Apache-2.0, 32,426 downloads | healthy | FiNER best weighted F1 **0.7948** (finance); ReFinED **85.0** AIDA / **75.1** MSNBC (general); mGENRE **90.2** Mewsli-9; SpEL **92.9/88.6** AIDA a/b — **none finance-validated** | **GLiNER** for zero-shot spans (person, product, org, event), then deterministic crosswalk |
+| Relation extraction | **REBEL** `Babelscape/rebel` ★576, **last commit 2023-11-09, repo licence: none**; HF `Babelscape/rebel-large` **CC-BY-NC-SA-4.0** | **stale + non-commercial** | GLiREL **83.67 F1 Wiki-ZSL**, **87.60 FewRel** (zero-shot); REBEL/UniRel F1 tables not exposed | **Avoid REBEL** (unmaintained + NC licence). Use a **constrained JSON-schema LLM extractor** with a closed relation vocabulary |
+| Event extraction | MAVEN-ERE (**4,480 docs**), ECB+ (**982 XML texts**, 502-doc/43-topic extension) — **both general-domain** | — | no finance-specific benchmark found | Weakly label finance events from **SEC form types** (8-K item codes, 10-Q/10-K dates) — free, dated, unambiguous |
+| Graph framework | `microsoft/graphrag` ★35,972 MIT (2026-08-24); `HKUDS/LightRAG` ★39,638 MIT (2026-09-14); `getzep/graphiti` ★30,866 Apache-2.0 (2026-09-11, 981 commits) | all healthy | GraphRAG docs **explicitly warn indexing is expensive** | **Do not run full GraphRAG for 5 tickers.** Borrow **Graphiti's bitemporal design** (valid-time + ingestion-time, provenance, incremental update) and implement it directly |
+| Dedup / canonicalisation | blocking + embedding similarity; Splink; LLM canonicalisation | — | — | Deterministic first (CIK/ticker), fuzzy only for person/product |
+
+**Lookahead bias in a KG — the critical rule.** A KG rebuilt over historical text will leak the
+future through three channels: (1) the *text* (an article dated T discussing an event at T−5 is
+fine; an article dated T+2 is not), (2) *revisions* (entity resolutions improved by later
+knowledge), (3) *model memory* (an LLM extractor trained after the test window already knows the
+outcome). Mitigations, all mandatory:
+- Every assertion carries **`valid_from`, `valid_to`, `ingested_at`, `source_url`, `source_ts`**.
+- Query the graph only with `source_ts < rebalance_ts`, and **trade at the next session's open**.
+- Freeze the extractor checkpoint and record its hash; state plainly in the results that the
+  extractor's pretraining cutoff post-dates part of the test window — this is an **unavoidable,
+  disclosable** limitation of any 2026 LLM used on 2015-2023 text.
+
+**Schema.** Keep it small. Node types: `Ticker`, `Company(CIK)`, `Person`, `Product`, `Event`,
+`Claim`, `Regime`, `Trade`, `Outcome`. Edge types: `MENTIONS`, `ABOUT`, `EMPLOYED_BY`,
+`SUPPLIES`, `COMPETES_WITH`, `CAUSED`, `PRECEDED`, `EVIDENCE_FOR`, `TRADED_UNDER`.
+**FIBO (MIT, EDM Council) and FRO are crosswalk targets, not the first schema** — adopting a heavy
+standard ontology up front will cost weeks and buy nothing for 5 tickers. Map to FIBO only if an
+external consumer demands it.
+
+### C.4 Agent-to-agent communication — recommendation
+
+| Option | Latency | Reproducibility | Complexity | Failure mode |
+|---|---|---|---|---|
+| **Shared store** (DuckDB tables + KuzuDB/NetworkX graph, single writer) | ms–s (irrelevant daily) | **Deterministic replay** — the backtest reads the same snapshot every run | Low | Write contention; solved by single-writer + append-only |
+| Message bus (Redis Streams / NATS / Kafka / ZeroMQ) | sub-ms | **Poor** — ordering, at-least-once delivery and timing jitter make replays differ | High | Silent message loss changes results run to run |
+| Embedding exchange (vector appended to the RL observation) | ms | Good, but opaque | Low | Un-auditable; you cannot explain why the policy moved |
+| MCP / A2A / ACP / AGNTCY | network | Poor for batch backtests | High | Stateful JSON-RPC and Agent-Card discovery solve *interactive tooling*, not *deterministic replay* |
+
+**Recommendation (D10): one shared bitemporal store, single writer, append-only.** At daily
+frequency latency is worth nothing and reproducibility is worth everything. Concretely: the
+sentiment/ontology agent appends rows to `kg_assertions` (DuckDB, with the temporal fields above)
+and nodes/edges to KuzuDB; the RL agent reads a **materialised as-of view** keyed by
+`rebalance_ts`. A bus buys nothing and costs determinism. **Keep the embedding exchange as the
+*interface*, not the transport**: the RL observation gets a fixed-width vector *derived* from the
+as-of view, so the policy input is a pure function of `(rebalance_ts, graph_snapshot_hash)`.
+Add MCP later only for a human-facing query tool.
