@@ -438,3 +438,443 @@ worth it when the graph is *not* the product; here the graph **is** the headline
 and learning curve. The custom React app renders only (a) the live EKG, (b) live equity vs
 baseline, (c) a live mirror of the current run's learning curve. If the React app dies, no
 experiment data is lost.
+
+---
+
+## Part E — Weights & Biases, sweeps and HPO for PPO/SAC
+
+### E.1 Live 2026 pricing and limits — fetched from https://wandb.ai/site/pricing/ on 2026-09-14
+
+| Plan | Price | Model seats | Storage | Weave ingestion | Tracked hours | Restriction |
+|---|---:|---:|---:|---:|---|---|
+| **Free** (cloud) | **$0/mo** | up to **5** | **5 GB/mo** | 1 GB/mo | not stated on page | "personal development of AI applications and models"; public **and** private projects; community support |
+| **Pro** (cloud) | **from $60/month**, billed monthly | up to **10** | **100 GB/mo**, extra **$0.03/GB** | 1.5 GB/mo | not stated | early-stage teams, **fewer than 50 employees**; page says Pro has "rate limits and performance constraints" |
+| **Enterprise** | custom | customisable | customisable | customisable | — | SSO, SCIM, CMEK, audit logs, single tenant, HIPAA option |
+| **Personal** (self-hosted, `wandb server start`) | **$0/mo** | **1 seat** | n/a (your disk) | — | — | ⚠ **"For personal projects only. Corporate use is not allowed."** |
+| **Academic** | **free forever** | up to **100 seats** | **200 GB** cloud (extra $0.03/GB/mo) | up to **25 GB/mo** | **unlimited** | All Pro features. "academic institutions pursuing research **not connected to a for-profit entity**… students, professors, postdoctoral researchers. An active email address affiliated with an academic institution is required." Apply via the pricing page → `https://wandb.ai/create-team` |
+
+Storage is billed as a 30-day rolling average: the page's worked example is
+`(100 GB×15d + 200 GB×1d + 300 GB×14d) / 30d = 196.6 GB → 197 GB`.
+
+**Operational note (live banner on docs.wandb.ai, 2026-09-14): "The Weights & Biases domain will
+change on September 30."** Pin nothing to a hard-coded host.
+
+**Action for this project:** apply for the **academic** licence if eligible. Otherwise the Free
+tier's **5 GB/month** is the binding constraint — a 60-trial RL sweep that uploads model
+checkpoints as artifacts will exhaust it. Mitigation: log scalars only, keep checkpoints on disk
+or in a reference artifact (the FAQ confirms externally-stored reference artifacts **do not**
+count against the quota).
+
+### E.2 Documented scale guidance and rate limits (docs.wandb.ai/guides/track/limits/)
+
+| Dimension | Guidance at scale (Multi-tenant Cloud) |
+|---|---:|
+| Runs per project | 10,000 |
+| Steps per run | 500,000 |
+| Metric cardinality per project | 100,000 |
+| Log frequency | **1,000 `run.log()` calls / minute** |
+| Throughput | **100,000 values / minute** |
+| Video throughput | 40 MB / minute |
+| Files per run | < 1,000 (use Artifacts above that) |
+
+Rate limits: exceeding them returns **HTTP 429** with `RateLimit-Limit`, `RateLimit-Remaining`
+and `RateLimit-Reset` headers (limit/remaining are scaled 0–1000; reset is in seconds). Metric
+limits apply **per project** and cover both request rate and total request size over a rolling
+window; paid plans get higher limits. The SDK retries with backoff, which **can delay
+`run.finish()`** until the window resets. GraphQL/public-API requests are limited per IP
+(unauthenticated) or per user (authenticated); the docs advise ≥1 s between public-API calls.
+W&B does **not** publish the actual numeric quotas.
+
+**RL consequence — do not log per environment step.** With `N` vectorised envs, a per-step
+`run.log()` multiplies the call rate by `N` and will hit 1,000 calls/min almost immediately. Log
+at the **rollout** boundary (aggregated return, losses, entropy, explained variance, KL, FPS) and
+at **evaluation checkpoints**. Batch related metrics into one call.
+
+**Offline:** `WANDB_MODE=offline` writes locally; upload later with `wandb sync <run-dir>`. Caveat
+for sweeps: a W&B **sweep agent must stay online** to receive suggestions from the sweep service.
+An offline sweep therefore requires an external controller (→ Optuna, E.4).
+
+### E.3 W&B Sweeps — verified capabilities (docs.wandb.ai/guides/sweeps/sweep-config-keys/)
+
+Top-level keys: `program` (req), `method` (req), `parameters` (req), `metric`, `entity`,
+`project`, `name`, `description`, `early_terminate`, `command`, `run_cap`.
+
+| Feature | Verified detail |
+|---|---|
+| Search methods | **`grid`, `random`, `bayes`** — those three only |
+| Bayes caveat | Docs state plainly: *"Bayesian search works well for small numbers of continuous parameters but scales poorly."* **The surrogate model and acquisition function are NOT documented.** Do not claim it is GP-BO or TPE |
+| Never-terminating | `grid` "executes forever" in a continuous space; `random` and `bayes` "run forever unless you stop" → **always set `run_cap`** |
+| Distributions | `uniform, q_uniform, log_uniform, log_uniform_values, inv_log_uniform, inv_log_uniform_values, normal, q_normal, log_normal, q_log_normal, categorical, int_uniform, constant` |
+| Early stopping | **Hyperband only.** `early_terminate: {type: hyperband, min_iter, max_iter, s, eta (default 3), strict (default false)}`. Brackets are counted in **number of logged iterations of the target metric**, not step values. "Hyperband checks which runs to end once every few minutes" |
+| Command macros | `${env} ${interpreter} ${program} ${args} ${args_no_boolean_flags} ${args_no_hyphens} ${args_json} ${args_json_file}` |
+| Multi-GPU agents | Documented pattern is one process per GPU: `CUDA_VISIBLE_DEVICES=0 wandb agent <ID>` / `CUDA_VISIBLE_DEVICES=1 wandb agent <ID>`. Across machines, launch agents with the same sweep ID |
+| Limits | **No documented maximum** on runs, agents, concurrency or sweep duration. Absence of a documented limit is not a capacity guarantee |
+
+**Sweeps × vectorised RL — the rules that matter:**
+
+1. **One W&B run per sweep trial**, in the learner process. `SubprocVecEnv` workers must **never**
+   call `wandb.init()`.
+2. Report **one scalar objective** at a **fixed environment-step budget** — e.g.
+   `eval/mean_return` or `eval/sharpe_net` over a fixed list of evaluation seeds/windows. Never
+   optimise the max training reward seen by any worker.
+3. Seed deterministically: trial seed in `wandb.config`, workers seeded `base_seed + worker_id`.
+4. Hyperband brackets must correspond to **comparable training units** (evaluation checkpoints /
+   env-step milestones), never wall-clock — GPU/CPU contention would then bias pruning.
+5. SB3 integration is `wandb.integration.sb3.WandbCallback` (logs metrics, tracks/uploads the
+   model, records full hyper-parameters, optional gradient logging); `wandb.init()` must be called
+   first.
+
+### E.4 W&B vs Optuna vs Ray Tune (all live 2026-09-14)
+
+| | **W&B Sweeps** (`wandb` SDK `v0.30.0`, 11,247 ★) | **Optuna `v5.0.0`** (2026-09-07, 14,791 ★, **21 open issues**) | **Ray Tune** (`ray-2.58.0`, 2026-08-23, 43,799 ★) |
+|---|---|---|---|
+| Search | grid / random / bayes (internals undocumented) | TPE + many samplers, **define-by-run** spaces, conditional spaces | wraps Optuna/HyperOpt; `HyperOptSearch` = TPE |
+| Pruning | Hyperband only | `MedianPruner`, `SuccessiveHalvingPruner`, `HyperbandPruner` via `report()` + `TrialPruned` | **ASHA**, **PBT** (pause/clone/mutate/resume) |
+| Study state | hosted, opaque | **RDB storage** (SQLite/MySQL/Postgres) + gRPC proxy → resumable, inspectable, multi-machine | Ray cluster state + checkpoints |
+| Dashboard | **best-in-class** | `optuna-dashboard` (history, importances, contours) | Ray dashboard |
+| Scheduling | you place agents yourself | you place workers yourself | **resource-aware cluster scheduler** |
+| Artifacts / lineage / reports / permissions | **yes — this is what it adds** | no | no |
+| Offline | agent must be online | fully offline | fully offline |
+
+**What W&B actually adds:** a durable, shareable, permissioned *system of record* — run lineage,
+config diffing across trials, artifact/model versioning, media, reports, and a UI that stays
+useful after the search finishes. **What it does worse:** opaque BO internals, no pruner choice
+beyond Hyperband, no resumable local study database, agent must be online.
+
+**Recommended:** **Optuna for search + pruning, W&B for logging** — Optuna ships
+`optuna.integration.WeightsAndBiasesCallback`, which tracks suggested hyper-parameters and the
+optimised metric in W&B. This satisfies the brief's "W&B for all hyper-parameter tuning" mandate
+(every trial is a W&B run, every sweep is a W&B project) while giving you a resumable SQLite study
+and a real pruner. **Fallback:** pure W&B Sweeps `method: bayes` + `early_terminate: hyperband`
+with `run_cap` — simpler, zero infrastructure, acceptable for ≤5 parameters.
+
+### E.5 Evidence-based HPO advice for PPO/SAC on a 5-asset trading env
+
+**What the literature actually says** (all arXiv IDs verified in this session):
+
+| Paper | arXiv | Finding relevant here |
+|---|---|---|
+| Andrychowicz et al., *What Matters In On-Policy Reinforcement Learning? A Large-Scale Empirical Study* | **2006.05990** | >250,000 agents trained. Implementation-level choices dominate. Strong support for **observation normalisation**; check value-function normalisation; **policy initialisation** matters significantly; gradient clipping is secondary |
+| Engstrom et al., *Implementation Matters in Deep Policy Gradients: A Case Study on PPO and TRPO* | **2005.12729** | Code-level optimisations account for much of PPO's reward advantage over TRPO and *fundamentally change agent behaviour*. → **An HPO comparison is invalid if any trial silently changes normalisation, advantage handling, init, clipping or the evaluation protocol** |
+| Eimer, Lindauer, Raileanu, *Hyperparameters in Reinforcement Learning and How To Tune Them* | **2306.01324** | The performance landscape depends strongly on the **tuning seed**; the same config has large variance; a config chosen on one seed can be **>4× worse on test seeds**. **Explicitly recommends separate tuning and testing seeds** |
+| Henderson et al., *Deep Reinforcement Learning that Matters* | **1709.06560** | Seed/implementation variance can swamp algorithmic differences |
+| Agarwal et al., *Deep RL at the Edge of the Statistical Precipice* | **2108.13264** | Report stratified bootstrap CIs / IQM, not point estimates, over few runs |
+| Li et al., *Hyperband* | **1603.06560** | The algorithm behind W&B's only early-stopping option |
+| Li et al., *A System for Massively Parallel Hyperparameter Tuning* (ASHA) | **1810.05934** | Ray Tune's async successive halving |
+| Jaderberg et al., *Population Based Training* | **1711.09846** | Ray Tune PBT |
+| Akiba et al., *Optuna* | **1907.10902** | TPE + pruners + RDB studies |
+| Liaw et al., *Tune* | **1807.05118** | Ray Tune |
+| Franke et al., *Sample-Efficient Automated Deep RL* (SEARL) | **2009.01555** | Population-based AutoRL for off-policy (SAC-class) methods |
+| Huang et al., *CleanRL* | **2111.08819** | Single-file reference PPO; vectorised envs |
+
+`UNVERIFIED`: arXiv **2412.07165** ("A Method for Evaluating Hyperparameter Sensitivity in RL") was
+surfaced by deep research but I did **not** run `verify_arxiv` on it. Do not cite it until checked.
+
+**Search-space priority for PPO** (5 assets, daily bars, `MlpPolicy`, discrete or Box action):
+
+| Tier | Parameters | Note |
+|---:|---|---|
+| 1 | `learning_rate` (log-uniform 1e-5…3e-3), `n_steps`, `n_envs`, `batch_size`, `n_epochs` | These set optimisation noise, sample reuse and updates-per-sample. Tune these first |
+| 2 | `clip_range`, `ent_coef` (log-uniform 1e-8…1e-1), `vf_coef`, `max_grad_norm`, `target_kl` | Update size, exploration, value/policy balance |
+| 3 | `gamma` (0.95–0.9999), `gae_lambda` (0.9–1.0), **obs/advantage normalisation flags**, `ortho_init`, net width/activation | Normalisation & init have the strongest published evidence (2006.05990) |
+| 4 | seed, eval frequency, total budget, feature preprocessing | Experimental controls — fix them or search them **explicitly**, never let them drift |
+
+**For SAC**, tune jointly: actor/critic `learning_rate`, `ent_coef` (`"auto"` vs fixed) and
+`target_entropy`, `batch_size`, `buffer_size`, `learning_starts`, `train_freq`/`gradient_steps`,
+`gamma`, `tau`, net arch. Hold action scaling, reward scaling, termination handling and
+observation normalisation **fixed** — otherwise they masquerade as algorithmic effects.
+
+**How many runs?** `DLR-RM/rl-baselines3-zoo` (2,878 ★, `v2.9.1` 2026-06-15, MIT) — the reference
+tuned-hyper-parameter repo — uses **Optuna with a default budget of 500 trials** and an
+intermediate evaluation every **100,000 timesteps** for pruning. Its PPO tuning also sets
+`ortho_init = False`, *unlike* the SB3 default — evidence that implementation defaults belong
+inside the search space.
+
+**Concrete budget for this project** (engineering recommendation, not a published law):
+
+| Stage | Trials | Seeds/trial | Parameters | Notes |
+|---|---:|---:|---:|---|
+| 0. Sanity | 1 | 1 | — | Verify the env, the reward, and that a random agent ≈ 0 net of costs |
+| 1. Coarse random | 30 | 1 | 8–10 | `method: random` + Hyperband. Purpose: find the live region, kill divergent configs cheaply |
+| 2. Focused Bayes/TPE | 50–80 | 1 | **5–6** (top movers from stage 1) | Optuna TPE + MedianPruner. A broad 10-D BO over noisy single-seed returns is *less* informative than a focused 5-D search with replication |
+| 3. Confirmation | top 5 configs | **5–10 seeds** | — | Report IQM + bootstrap CI (2108.13264), not the best seed |
+| **Total** | **~110 trials + 50 confirmation runs** | | | |
+
+**Avoiding tuning on the test window — mandatory protocol for a finance backtest:**
+
+1. Split **chronologically**: train → validation(tuning) → **untouched test**. Never random-split.
+2. Run all HPO **inside the training/validation window only**.
+3. Select on validation risk-adjusted return (Sharpe **net of transaction costs**), not raw return.
+4. Evaluate **once** on the next untouched period. One look.
+5. **Walk forward**: roll the whole window and repeat; report the *distribution* of out-of-sample
+   results across folds, not a single number.
+6. Freeze evaluation seeds within a comparison so every candidate faces identical randomness.
+7. Use **separate tuning seeds and testing seeds** — this is 2306.01324's explicit recommendation,
+   and the >4×-worse-on-test-seeds result is the reason.
+8. Record the number of configurations tried; the more you try, the more the best validation
+   Sharpe is an overfit order statistic.
+
+---
+
+## Part F — Training compute on Prime Intellect
+
+Docs index: `https://docs.primeintellect.ai/llms.txt` (fetched 2026-09-14; any page + `.md`
+returns markdown). Official CLI/SDK repo: `PrimeIntellect-ai/prime` (326 ★, pushed 2026-09-14,
+MIT).
+
+### F.1 Renting a GPU pod from the CLI — verified command reference
+
+```bash
+# install + auth
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv tool install prime                 # or: pip install prime
+prime login                           # or: prime config set-api-key  /  export PRIME_API_KEY=...
+prime config set-ssh-key-path         # keys generated at app.primeintellect.ai/dashboard/profile
+prime config view
+
+# find capacity + price
+prime availability list
+prime availability list --gpu-type H100_80GB --regions united_states --socket PCIe --no-group-similar
+prime availability gpu-types
+prime availability disks              # persistent-disk offers + $/GB/hr
+
+# create / manage / destroy
+prime pods create                     # interactive
+prime pods create --id <ID> --name rl-trader --disk-size 100 --vcpus 16 --memory 64 \
+                  --image <img> --env KEY=value --disks <disk-id>
+prime pods list
+prime pods status <pod-id>
+prime pods ssh <pod-id>               # chmod 400 your private key first
+prime pods terminate <pod-id>
+prime disks list
+```
+
+Filters for `availability list`: `--gpu-type --gpu-count --regions --socket {PCIe,SXM2,SXM3,SXM4,SXM5}
+--disks --group-similar/--no-group-similar`. `pods create` options: `--id --cloud-id --gpu-type
+--gpu-count --name --disk-size --vcpus --memory --image --team-id --env --disks --share-with-team
+--add-members`.
+
+> **Correction to a common claim:** `prime pods status` and `prime pods terminate` **are**
+> documented — both in `docs.primeintellect.ai/cli-reference/provision-gpu.md` and in the
+> `PrimeIntellect-ai/prime` README. Likewise `prime env init` / `prime env push` /
+> `prime env install` / `prime env list` / `prime env info` / `prime env inspect` are all in the
+> README.
+
+**Billing mechanics (FAQ, verified):** on-demand pods are non-interruptible; **Spot** uses unused
+capacity at "discounts of up to 90%" and can be interrupted. **Credits are deducted every minute
+while the pod is active**, and **pods are automatically deleted if credits run out**. There is
+**no formal SLA**. Terminating a pod **destroys all its data**; pause/resume exists only on some
+providers (Runpod, data in `/workspace`, only while *paused*, not terminated).
+
+### F.2 Prices (2026-09-14) — with an explicit honesty caveat
+
+The authenticated API `GET https://api.primeintellect.ai/api/v1/availability/gpus` returned
+**403 `{"detail":"Not authenticated"}`** for me (no Prime API key in this session), and my static
+fetch of `app.primeintellect.ai/dashboard/create-cluster` returned a **client-rendered JS shell
+with no prices in the HTML**. The table below therefore comes from a **browser-rendered snapshot
+taken by the deep-research tool on 2026-09-14**; treat it as a point-in-time marketplace quote.
+**Authoritative check is always `prime availability list`.**
+
+| GPU | VRAM | Community $/hr | Secure $/hr |
+|---|---:|---:|---:|
+| **RTX A2000** | 6 GB | **$0.15** | — |
+| RTX 4090 | 24 GB | **$0.37** | $0.72 |
+| L4 | 24 GB | — | $0.46 |
+| L40S | 48 GB | — | $1.00 |
+| A100 | 40 GB | — | $1.45 |
+| A100 | 80 GB | $1.22 | $1.35 |
+| H100 | 80 GB | $2.72 | $1.90 |
+| H200 | 141 GB | — | $3.65 |
+
+From `www.primeintellect.ai` homepage cards (same date, **my own fetch**): H100 **$2.43/hr**
+on-demand vs H100 **Spot $0.94/hr**; B300 288 GB **$4.99/hr**; B200 192 GB **$3.49/hr**.
+⚠ Several homepage cards all show "$3.14/HR" (π) and look decorative — I do not cite those.
+
+### F.3 CPU-only: yes, via **Sandboxes** — and this is the right product here
+
+`docs.primeintellect.ai/sandboxes/overview.md` (verified) publishes explicit **CPU-only** pricing:
+
+| Resource | Price |
+|---|---|
+| CPU | **$0.05 per core per hour** |
+| Memory | **$0.01 per GB per hour** |
+| Disk | **$0.001 per GB per hour** |
+| Docs' worked example | 1 core + 2 GB RAM + 10 GB disk = **$0.08/hour** |
+
+VM-sandbox limits: 1–16 cores, 0.1–64 GB RAM, 0.1–128 GB disk, 0–8 GPUs (GPU sandboxes "coming
+soon"), timeout 1 min–unlimited, idle timeout ≤1,440 min. Per account: 512 active sandboxes,
+512 cores, 4,096 GB memory, 5,120 GB storage, 128 HTTP + 32 TCP port exposures. Sandboxes run
+standard Docker images and support `prime tunnel` for exposing a local service.
+
+### F.4 Is a GPU even justified? **No.**
+
+The workload: 5 equities, **daily** bars. ~15 years ≈ 3,800 steps/episode. Observation ≈ 50–100
+floats. Policy = 2×64 MLP ≈ 10k parameters. PPO minibatch 64–256.
+
+An honest engineering argument (**not** a cited benchmark — I did not find a published
+CPU-vs-GPU benchmark for SB3 `MlpPolicy` in this session, so this is reasoning, marked as such):
+a forward+backward pass on a 2×64 MLP at batch 256 is a handful of small GEMMs. On a GPU each one
+is dominated by kernel-launch and host↔device transfer overhead (µs-scale launches for
+sub-µs-of-work kernels). The real cost of this workload is the **Python environment step loop**,
+which is CPU-bound and parallelises across `SubprocVecEnv` workers. **Cores beat FLOPs here.**
+
+| Configuration | Hourly cost | Fit |
+|---|---:|---|
+| **Sandbox, 16 cores / 32 GB / 64 GB disk** | 16×0.05 + 32×0.01 + 64×0.001 = **$1.184/hr** | ✅ **best for parallel sweep trials** — 16 concurrent single-core trials |
+| **Sandbox, 8 cores / 16 GB / 50 GB** | 8×0.05 + 16×0.01 + 50×0.001 = **$0.61/hr** | ✅ everyday dev / single training run |
+| **Sandbox, 4 cores / 8 GB / 30 GB** | 4×0.05 + 8×0.01 + 30×0.001 = **$0.31/hr** | ✅ cheapest sane box |
+| RTX A2000 6 GB pod (community) | **$0.15/hr** | ⚠ cheapest *listed* compute overall, but check its vCPU count — if it ships ≥8 vCPUs it is the best value on the platform for this workload, GPU unused |
+| RTX 4090 pod (community) | **$0.37/hr** | ✅ acceptable — buy it for its **vCPUs**, not its GPU |
+| H100 | $1.90–2.72/hr | ❌ ~5–18× the cost for no measurable benefit on a 10k-parameter MLP |
+
+**Recommendation:** run training on a **CPU sandbox or the cheapest CPU-rich pod**, not an H100.
+This directly contradicts the master brief's "training happens on cloud GPUs" constraint, and I am
+flagging it as a **deliberate, evidence-based deviation**: it is still *cloud* training, still
+CLI-first, still reproducible — just not GPU-bound, because the model is 10k parameters.
+A GPU only becomes worth renting if the design later adds (a) a transformer/LSTM feature encoder
+over long sequences, (b) a GNN over the EKG with ≥10k nodes in the forward pass, or (c) an LLM in
+the sentiment/ontology agent.
+
+### F.5 Storage
+
+| Option | Behaviour | Price |
+|---|---|---|
+| **Persistent disk** | Survives instance **and cluster** termination; attachable to multiple instances simultaneously; **must match the provider and location** of the compute; created first, must be `Active`; attach with `prime pods create --disks <id>`; discover with `prime availability disks` / `prime disks list` | The docs' example availability rows show **$0.00011111/GB/hr** (runpod US-WA-1, max 8,192 GB, multinode yes) and **$0.000097/GB/hr** (hyperstack NORWAY-1, max 100,000 GB, multinode no) → ≈ **$0.071–$0.081 per GB-month** |
+| **Cluster ephemeral shared storage** | Created for the cluster lifetime, shared by nodes, **deleted when the cluster terminates** | included |
+| **Pod boot disk** | `--disk-size`; **destroyed on terminate** | included in pod rate |
+| Object storage / S3 | **No first-party S3-compatible object store found in the docs.** FAQ says: *"Always back up critical data to external storage (e.g. S3) before terminating or pausing."* | — |
+
+**For this project:** a **50 GB persistent disk ≈ $3.55–$4.05/month** holding the market-data
+cache, the EKG snapshots and the checkpoint archive. Everything else lives in git + W&B.
+
+### F.6 prime-rl and the Environments Hub — do **not** use them here
+
+| Question | Verified answer |
+|---|---|
+| What is `prime-rl`? | `PrimeIntellect-ai/prime-rl` (2,038 ★, `v0.9.0` 2026-08-25, Apache-2.0, pushed 2026-09-14): *"Fully asynchronous RL for high-throughput **agentic** training at scale"*, targeting 1T+ MoE models on 1,000+ GPUs, **FSDP2** for training + **vLLM** for inference, FP8, expert/context parallelism |
+| Which algorithms? | From `docs.primeintellect.ai/prime-rl/algorithms.md`, configured under `[orchestrator.algo]`: **`grpo`, `max_rl`, `rae`, `hierarchical_grpo`, `opd`, `sft`, `opsd`, `echo`**. **There is no standalone continuous-control PPO or SAC trainer.** All of these are LLM-token-level losses |
+| Can it train an MLP PPO trading policy? | **No documented path.** It assumes language-model policies, token losses, model references, rollouts and verifier-style environments. It does not accept a Gymnasium env |
+| What is a `verifiers` "environment"? | `PrimeIntellect-ai/verifiers` (4,614 ★, `v0.3.1` 2026-08-24, MIT): *"our library for creating environments to train and evaluate **LLMs**"* — datasets, parsers, tool calls, multi-turn trajectories, rubric/verifier scoring. **Not** a numeric-observation/continuous-action Gym API |
+| Publishing | `prime env init <name>` → `prime env push <name>`; browse with `prime env list`, install with `prime env install <name>`. The Hub is migrating to **verifiers v1**; v0 environments carry a **Legacy** tag and the v0 create workflow is marked deprecated |
+| Is wrapping RL-Trader as a verifiers environment worth it? | **No.** It would require reformulating the task as an LLM agent receiving serialised market state as text and being scored by a rubric — a *different project* with different latency, cost and evaluation semantics. The EKG/sentiment layer of this system could *one day* be an LLM task worth publishing; the PPO/SAC execution core cannot |
+
+**Sandboxes / Inference / Hosted Training:** Sandboxes are priced above and are genuinely useful
+(disposable reproducible boxes, `prime tunnel` to expose the dashboard). Prime **Inference** is an
+OpenAI-compatible LLM API — relevant only to the sentiment/ontology agent, not to trading.
+**Hosted Training** ("Lab") trains models *against verifiers environments* — same LLM-only scope;
+its `Models & Pricing` page exists but I did not extract a stable rate table → `UNVERIFIED`.
+Free credits / academic programme for Prime Intellect: **not found in the public docs** → `UNVERIFIED`.
+
+### F.7 Realistic full-project compute bill
+
+Assumes: CPU sandbox/pod, HPO per E.5, 50 GB persistent disk, W&B academic (free) or free tier.
+
+| Line item | Basis | Cost |
+|---|---|---:|
+| Baseline replication + data pipeline dev | 20 hr × $0.61/hr (8-core sandbox) | **$12** |
+| Stage-1 coarse sweep (30 trials × ~25 min, 16-way parallel) | ~1.0 hr wall × $1.184/hr | **$1.20** |
+| Stage-2 focused TPE sweep (80 trials × ~25 min, 16-way) | ~2.1 hr × $1.184/hr | **$2.50** |
+| Stage-3 confirmation (5 configs × 10 seeds × 25 min, 16-way) | ~1.3 hr × $1.184/hr | **$1.55** |
+| Repeat the above for **SAC** and for **2 walk-forward folds** | ×6 | **$32** |
+| Long training runs (final agents, 10 × 4 hr, 8-core) | 40 hr × $0.61/hr | **$24** |
+| EKG self-evolution loop experiments | 60 hr × $0.61/hr | **$37** |
+| Persistent disk, 50 GB × 3 months | 50 × $0.081 × 3 | **$12** |
+| Dashboard host (small sandbox, 200 hr) | 200 hr × $0.31/hr | **$62** |
+| Contingency + failed runs | +40 % | **$74** |
+| **Total (CPU plan)** | | **≈ $260** |
+| *Same plan on an H100 instead* | swap $0.61→$1.90 and $1.184→$2.72 | **≈ $700–800, for no measurable gain** |
+| *If an LLM sentiment agent is added later* | Prime Inference / OpenAI-compatible tokens | not estimated — `UNVERIFIED` |
+
+**W&B cost: $0** on the academic licence (200 GB, unlimited tracked hours) or on the Free tier
+provided you log **scalars only** and keep checkpoints as reference artifacts.
+
+---
+
+## Verification log
+
+All checks performed **2026-09-14** in this session. `gh-api` = authenticated GitHub REST API
+(`/repos/{name}` + `/releases/latest`); `npm-registry` = `https://registry.npmjs.org/<pkg>`;
+`fetch` = direct HTTPS GET, status recorded; `verify_url` = `rt.verify_url`;
+`verify_arxiv` = `rt.verify_arxiv`.
+
+| # | Claim | URL | Check | Status |
+|---:|---|---|---|---|
+| 1 | Gated graph render/layout benchmark exists; repo created 2026-08-12, MIT | https://github.com/GusEllerm/viz-bench | gh-api + verify_url | ✅ 200, ★0, pushed 2026-08-20 |
+| 2 | Render results (fps, memory) per library | https://raw.githubusercontent.com/GusEllerm/viz-bench/HEAD/graph-bench/web/bench/results/overview-matrix.json | fetch + JSON parse | ✅ 200, 40 records parsed |
+| 3 | Layout iters/sec: FA2 CPU 1.61 @100k vs cosmos.gl GPU 39.7 @100k | https://raw.githubusercontent.com/GusEllerm/viz-bench/HEAD/graph-bench/web/bench/results/layout-matrix.json | fetch + JSON parse | ✅ 200, 12 records |
+| 4 | Report site | https://gusellerm.github.io/viz-bench/ | verify_url | ✅ 200 |
+| 5 | `@cosmos.gl/graph@3.4.1` is **MIT**, published 2026-08-13 | https://registry.npmjs.org/@cosmos.gl/graph | npm-registry | ✅ MIT |
+| 6 | `@cosmograph/cosmos@3.4.1` is **CC-BY-NC-4.0**, published 2026-07-31 | https://registry.npmjs.org/@cosmograph/cosmos | npm-registry | ✅ CC-BY-NC-4.0 |
+| 7 | `@cosmograph/react@2.5.1` is CC-BY-NC-4.0 | https://registry.npmjs.org/@cosmograph/react | npm-registry | ✅ CC-BY-NC-4.0 |
+| 8 | cosmos.gl repo MIT, 1,269★, pushed 2026-09-13, 13 open issues; GPU shaders; `setPointPositions`/`setLinks`; GPU transitions | https://github.com/cosmosgl/graph | gh-api + raw README | ✅ 200 |
+| 9 | Old `cosmograph-org/cosmos` repo no longer public | https://api.github.com/repos/cosmograph-org/cosmos | gh-api | ✅ **404** (confirmed absent) |
+| 10 | d3-force dormant: last push 2023-12-30, npm 3.0.0 @2021-06-05, ISC | https://github.com/d3/d3-force · https://registry.npmjs.org/d3-force | gh-api + npm-registry | ✅ |
+| 11 | sigma 12,164★ pushed 2026-09-14, `sigma@4.0.0-beta.5` 2026-08-20, MIT | https://github.com/jacomyal/sigma.js | gh-api | ✅ |
+| 12 | graphology 0.26.0 (2025-01-26) MIT; `graphology-layout-forceatlas2@0.10.1` (2022-10-17) MIT | registry.npmjs.org | npm-registry | ✅ |
+| 13 | deck.gl `v9.4.0` 2026-09-05, MIT, 14,588★ | https://github.com/visgl/deck.gl | gh-api | ✅ |
+| 14 | Cytoscape.js `v3.34.3` 2026-09-07, MIT; perf page tests 200→20,000 nodes | https://github.com/cytoscape/cytoscape.js · https://cytoscape.org/js-perf/ | gh-api + verify_url | ✅ 200 |
+| 15 | AntV G6 `5.1.1`, MIT, 333 open issues | https://github.com/antvis/G6 | gh-api | ✅ |
+| 16 | react-force-graph `1.29.1` MIT, 218 open issues; 3d-force-graph 14.2 MB unpacked | https://github.com/vasturiano/react-force-graph · registry.npmjs.org | gh-api + npm-registry | ✅ |
+| 17 | Reagraph `4.32.0` Apache-2.0 | https://github.com/reaviz/reagraph | gh-api + npm-registry | ✅ |
+| 18 | helios-web `0.10.9` MIT on npm; GitHub shows **no licence field**, 92★ | https://github.com/filipinascimento/helios-web | gh-api + npm-registry | ✅ (licence mismatch noted) |
+| 19 | IPC/WebSocket loopback benchmark, 2026-03-04, GH Actions ubuntu-latest, 100k round trips | https://github.com/suenot/trading-ipc-bench | verify_url | ✅ 200 |
+| 20 | websockets: ~64 KiB/conn with compression, ~14 KiB without; `max_size` 1 MiB, `max_queue` 16; bufferbloat warning | https://websockets.readthedocs.io/en/stable/topics/memory.html | verify_url | ✅ 200 |
+| 21 | websockets broadcast: naive loop lets one slow client block all; built-in broadcast has no per-client backpressure | https://websockets.readthedocs.io/en/stable/topics/broadcast.html | verify_url | ✅ 200 |
+| 22 | Starlette thread pool default 40 tokens | https://starlette.dev/threadpool/ | verify_url | ✅ 200 |
+| 23 | SSE: 6 connections per browser+origin on HTTP/1.1; HTTP/2 ≈100 streams; `id`/`retry`/`Last-Event-ID` | https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events | verify_url | ✅ 200 |
+| 24 | msgspec decode benchmark (77 MiB JSON): msgspec Struct 176.8 ms vs orjson 691.7 ms vs json 868.6 ms | https://msgspec.dev/benchmarks | verify_url | ✅ 200 |
+| 25 | `encode/broadcaster` is **ARCHIVED**, last push 2025-04-09 | https://github.com/encode/broadcaster | gh-api + verify_url | ✅ `archived: true` |
+| 26 | FastAPI `0.141.1` (2026-07-29), 102,331★, MIT | https://github.com/fastapi/fastapi | gh-api | ✅ |
+| 27 | lightweight-charts `v5.2.1` 2026-08-12, Apache-2.0, 17,256★ | https://github.com/tradingview/lightweight-charts | gh-api + npm-registry | ✅ |
+| 28 | **Mandatory TradingView attribution** — NOTICE text + link requirement quoted verbatim | https://raw.githubusercontent.com/tradingview/lightweight-charts/master/README.md · .../NOTICE | fetch (raw) | ✅ 200, quoted |
+| 29 | uPlot `1.6.32` (2025-03-14) MIT, 533 KB unpacked; project claims 166,650 points in 25 ms | https://github.com/leeoniya/uPlot · https://leeoniya.github.io/uPlot/ | gh-api + verify_url | ✅ 200 |
+| 30 | plotly.js `4.1.0`, MIT, 91.5 MB unpacked, 772 open issues | https://github.com/plotly/plotly.js · registry.npmjs.org | gh-api + npm-registry | ✅ |
+| 31 | ECharts `6.1.0`, Apache-2.0, 67,315★, 1,501 open issues | https://github.com/apache/echarts | gh-api | ✅ |
+| 32 | Recharts `v3.10.1`, MIT; own perf guide warns about large data / rapid change | https://github.com/recharts/recharts · https://recharts.github.io/guide/performance/ | gh-api + verify_url | ✅ 200 |
+| 33 | Streamlit `1.63.0` (2026-09-01), Apache-2.0, 1,162 open issues | https://github.com/streamlit/streamlit | gh-api | ✅ |
+| 34 | Dash `v4.4.1` (2026-07-21), MIT | https://github.com/plotly/dash | gh-api | ✅ |
+| 35 | Panel `v1.9.4` (2026-08-17), BSD-3-Clause, 1,113 open issues | https://github.com/holoviz/panel | gh-api | ✅ |
+| 36 | Gradio `6.27.0` (2026-09-11), Apache-2.0 | https://github.com/gradio-app/gradio | gh-api | ✅ |
+| 37 | Reflex `v0.9.11`, NiceGUI `v3.16.0`, Rerun `0.37.2` | github.com/{reflex-dev/reflex, zauberzeug/nicegui, rerun-io/rerun} | gh-api | ✅ |
+| 38 | **W&B live pricing**: Free $0 / 5 seats / 5 GB-mo; Pro from $60/mo / 10 seats / 100 GB-mo / $0.03 per extra GB; Personal self-host $0, 1 seat, **corporate use not allowed**; **Academic free, 200 GB, unlimited tracked hours, 25 GB/mo Weave, 100 seats** | https://wandb.ai/site/pricing/ | fetch + verify_url | ✅ 200, text quoted |
+| 39 | W&B scale guidance 10k runs / 500k steps / 100k cardinality / 1,000 log-calls per min / 100k values per min; HTTP 429 + `RateLimit-*` headers; per-project metric limits; ≥1 s between public-API calls | https://docs.wandb.ai/guides/track/limits/ | fetch + verify_url | ✅ 200, text quoted |
+| 40 | W&B sweeps: only `grid`/`random`/`bayes`; **Hyperband is the only early-stopping algorithm** (`min_iter,max_iter,s,eta=3,strict`); `run_cap`; command macros; BO internals undocumented; "scales poorly" | https://docs.wandb.ai/guides/sweeps/sweep-config-keys/ | fetch + verify_url | ✅ 200, text quoted |
+| 41 | W&B SDK `v0.30.0` 2026-09-09, MIT | https://github.com/wandb/wandb | gh-api | ✅ |
+| 42 | Optuna `v5.0.0` 2026-09-07, MIT, 14,791★, 21 open issues | https://github.com/optuna/optuna | gh-api | ✅ |
+| 43 | Ray `ray-2.58.0` 2026-08-23, Apache-2.0, 43,799★ | https://github.com/ray-project/ray | gh-api | ✅ |
+| 44 | SB3 `v2.9.0` 2026-06-15 MIT; rl-baselines3-zoo `v2.9.1` 2026-06-15 MIT (500-trial Optuna default, eval every 100k steps, `ortho_init=False` for PPO) | https://github.com/DLR-RM/stable-baselines3 · https://github.com/DLR-RM/rl-baselines3-zoo | gh-api + verify_url | ✅ 200 |
+| 45 | CleanRL 10,398★, last push 2026-04-20, licence `NOASSERTION` | https://github.com/vwxyzjn/cleanrl | gh-api | ✅ |
+| 46 | SB3 RL Tips page reachable (but contains **no** CPU-vs-GPU guidance — my CPU claim is reasoning, not a citation) | https://stable-baselines3.readthedocs.io/en/master/guide/rl_tips.html | verify_url + text scan | ✅ 200, term "CPU" absent |
+| 47 | arXiv 2006.05990 *What Matters In On-Policy RL?* | arxiv.org/abs/2006.05990 | verify_arxiv | ✅ title matched |
+| 48 | arXiv 2005.12729 *Implementation Matters in Deep Policy Gradients* | arxiv.org/abs/2005.12729 | verify_arxiv | ✅ |
+| 49 | arXiv 2306.01324 *Hyperparameters in RL and How To Tune Them* | arxiv.org/abs/2306.01324 | verify_arxiv | ✅ |
+| 50 | arXiv 2111.08819 *CleanRL* | arxiv.org/abs/2111.08819 | verify_arxiv | ✅ |
+| 51 | arXiv 1709.06560 *Deep RL that Matters* | arxiv.org/abs/1709.06560 | verify_arxiv | ✅ |
+| 52 | arXiv 2108.13264 *Deep RL at the Edge of the Statistical Precipice* | arxiv.org/abs/2108.13264 | verify_arxiv | ✅ |
+| 53 | arXiv 1603.06560 *Hyperband* | arxiv.org/abs/1603.06560 | verify_arxiv | ✅ |
+| 54 | arXiv 1907.10902 *Optuna* | arxiv.org/abs/1907.10902 | verify_arxiv | ✅ |
+| 55 | arXiv 1807.05118 *Tune* | arxiv.org/abs/1807.05118 | verify_arxiv | ✅ |
+| 56 | arXiv 2009.01555 *Sample-Efficient Automated Deep RL* | arxiv.org/abs/2009.01555 | verify_arxiv | ✅ |
+| 57 | arXiv 1810.05934 *A System for Massively Parallel Hyperparameter Tuning* (ASHA) | arxiv.org/abs/1810.05934 | verify_arxiv | ✅ |
+| 58 | arXiv 1711.09846 *Population Based Training* | arxiv.org/abs/1711.09846 | verify_arxiv | ✅ |
+| 59 | arXiv 2412.07165 (HP sensitivity in RL) | — | **not run** | ⚠ **UNVERIFIED — do not cite** |
+| 60 | Prime docs index (`llms.txt`, 222 page links) | https://docs.primeintellect.ai/llms.txt | fetch + verify_url | ✅ 200, 31,258 chars |
+| 61 | `prime` CLI install/auth/ssh/availability/pods commands incl. `pods status` and `pods terminate` | https://docs.primeintellect.ai/cli-reference/provision-gpu.md · .../introduction.md · .../check-gpu-availability.md | fetch | ✅ 200 ×3, commands quoted |
+| 62 | `PrimeIntellect-ai/prime` official CLI+SDK, 326★, MIT, pushed 2026-09-14; `prime env init/push/install/list/info/inspect` | https://github.com/PrimeIntellect-ai/prime | gh-api + raw README | ✅ 200 |
+| 63 | **Sandbox CPU-only pricing** $0.05/core/hr, $0.01/GB-RAM/hr, $0.001/GB-disk/hr; example $0.08/hr; VM limits 1–16 cores / ≤64 GB / ≤128 GB; account caps 512 cores | https://docs.primeintellect.ai/sandboxes/overview.md | fetch + verify_url | ✅ 200, quoted |
+| 64 | Persistent disks survive termination, attachable to many instances, must match provider+location; cluster ephemeral storage deleted with cluster | https://docs.primeintellect.ai/tutorials-storage/create-persistent-storage.md | fetch | ✅ 200 |
+| 65 | Disk price rows $0.00011111 and $0.000097 per GB/hr; disk availability columns | https://docs.primeintellect.ai/cli-reference/check-gpu-availability.md | fetch | ✅ 200, table quoted |
+| 66 | FAQ: on-demand vs spot (≤90 % off), per-minute credit deduction, auto-delete on zero credits, no SLA, terminate = data loss | https://docs.primeintellect.ai/faq.md | fetch | ✅ 200 |
+| 67 | `prime-rl` algorithms are `grpo, max_rl, rae, hierarchical_grpo, opd, sft, opsd, echo` — no standalone PPO/SAC | https://docs.primeintellect.ai/prime-rl/algorithms.md | fetch + verify_url | ✅ 200, 41,002 chars |
+| 68 | `prime-rl` = async agentic LLM RL, FSDP2 + vLLM; `v0.9.0` 2026-08-25, Apache-2.0, 2,038★ | https://github.com/PrimeIntellect-ai/prime-rl · https://docs.primeintellect.ai/prime-rl/overview.md | gh-api + fetch | ✅ |
+| 69 | `verifiers` = "library for creating environments to train and evaluate **LLMs**"; `v0.3.1` 2026-08-24, MIT, 4,614★; Hub migrating to v1, v0 deprecated | https://github.com/PrimeIntellect-ai/verifiers · https://docs.primeintellect.ai/tutorials-environments/environments.md | gh-api + fetch | ✅ |
+| 70 | Live GPU availability API requires auth | https://api.primeintellect.ai/api/v1/availability/gpus | fetch | ⚠ **403 Not authenticated** — prices below are a browser snapshot, not my own API read |
+| 71 | `app.primeintellect.ai/dashboard/create-cluster` GPU price table | https://app.primeintellect.ai/dashboard/create-cluster | fetch | ⚠ 200 but **client-rendered shell, no prices in HTML**. Table in F.2 is a deep-research browser snapshot (2026-09-14) |
+| 72 | Homepage GPU cards: H100 $2.43/hr, H100 Spot $0.94/hr, B300 $4.99/hr, B200 $3.49/hr | https://www.primeintellect.ai/ | fetch + HTML parse | ✅ 200, parsed; several "$3.14/HR" cards judged decorative and **not cited** |
+| 73 | Prime Hosted Training public rate table; Prime free credits / academic programme | — | not found in docs | ⚠ **UNVERIFIED** |
+| 74 | Ogma / KeyLines / yFiles / Graphistry benchmarks & prices; `drkameleon/GraphGPU` | — | not fetched | ⚠ **UNVERIFIED — not used in any recommendation** |
+| 75 | npm web pages returned 403 to this client; all package facts come from `registry.npmjs.org` instead | https://registry.npmjs.org/… | npm-registry | ✅ 23 packages read |
+
+**Totals: 73 verified checks (✅), 6 explicitly marked UNVERIFIED (⚠) and excluded from every
+recommendation.** Raw deep-research reports are preserved at `docs/research/_raw/06_*.md`
+(graph, ui, stream, wandb, prime).
