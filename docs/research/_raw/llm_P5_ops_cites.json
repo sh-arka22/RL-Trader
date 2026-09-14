@@ -1,0 +1,127 @@
+[
+  {
+    "url": "https://arxiv.org/abs/2412.20138",
+    "title": "[2412.20138] TradingAgents: Multi-Agents LLM Financial ...",
+    "excerpt": "Significant progress has been made in automated problem-solving using societies of agents powered by large language models (LLMs). In finance, efforts have largely focused on single-agent systems handling specific tasks or multi-agent frameworks independently gathering data. However, the multi-agent"
+  },
+  {
+    "url": "https://mistral.ai/pricing/",
+    "title": "Pricing | Mistral",
+    "excerpt": "For most tasks and coding: [Mistral Medium](https://docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04) ."
+  },
+  {
+    "url": "https://platform.claude.com/docs/en/about-claude/pricing",
+    "title": "Pricing",
+    "excerpt": "| Claude Fable 5.1                                                                                                                      | $10 / MTok        | $12.50 / MTok   | $20 / MTok      | $0.25 / MTok1            | $50 / MTok    |"
+  },
+  {
+    "url": "https://api-docs.deepseek.com/quick_start/pricing/?article_id=article_1779470751466_8",
+    "title": "Models & Pricing | DeepSeek API Docs",
+    "excerpt": "**|MODEL |deepseek-flash (1) |deepseek-v4-pro (2) | |BASE URL (OpenAI Format) |<https://api.deepseek.com> | |BASE URL (Anthropic Format) |<https://api.deepseek.com/anthropic> | |MODEL VERSION |DeepSeek-V4.1-Flash |DeepSeek-V4-Pro-0813 |"
+  },
+  {
+    "url": "https://ai.google.dev/gemini-api/docs/pricing",
+    "title": "Gemini Developer API pricing \u00a0|\u00a0 Gemini API \u00a0|\u00a0 Google AI for Developers",
+    "excerpt": "Gemini 3.5 Flash"
+  },
+  {
+    "url": "https://docs.x.ai/developers/pricing",
+    "title": "API Pricing | SpaceXAI Docs",
+    "excerpt": "|Model |Context |Short context |Long context | |Input |Cached |Output |Input |Cached |Output | |grok-4.6 Long context \u2265 200k tokens |500k |$2.00 |$0.50 |$6.00 |$4.00 |$1.00 |$12.00 | |grok-build-0.1"
+  },
+  {
+    "url": "https://www.together.ai/pricing",
+    "title": "Pricing | Together AI",
+    "excerpt": "| [![](https://cdn.prod.website-files.com/69654e88dce9154b5f12070c/69a18317271d489552805214_Deepseek.svg)DeepSeek V4 Pro 0813](https://www.together.ai/models/deepseek-v4-pro-0813)                               | $1.32$0.13 (cached)  | $3.96  |                                                         "
+  },
+  {
+    "url": "https://developers.openai.com/api/docs/pricing",
+    "title": "Pricing",
+    "excerpt": "Flagship models Our latest models Prices per 1M tokens. Standard Standard pricing data | Model | Short context input | Short context cached input | Short context cache writes | Short context output | Long context input | Long context cached input | Long context cache writes | Long context output | |"
+  },
+  {
+    "url": "https://docs.fireworks.ai/guides/querying-text-models",
+    "title": "Text Models",
+    "excerpt": "Text Models > Query, track and manage inference for text models <Info> New to Fireworks? Start with the [Serverless Quickstart](/getting-started/quickstart) for a step-by-step guide to making your first API call. </Info> Fireworks provides fast, cost-effective access to leading open-source text mode"
+  },
+  {
+    "url": "https://www.runpod.io/pricing",
+    "title": "GPU Cloud Pricing | Per-Second H100, A100, RTX | Runpod",
+    "excerpt": "GPU cloud pricing up to 90% lower than traditional cloud providers. Per-second rates for on-demand Pods, Serverless, Clusters, and Network Storage."
+  },
+  {
+    "url": "https://vast.ai/pricing",
+    "title": "GPU Pricing \u2014 Live Platform Rates | Vast.ai",
+    "excerpt": "Choose Your Instance Type Three pricing tiers to match your workload and budget. On-Demand Most Popular Guaranteed uptime. Best for production. Per-second billing No interruptions Spin up/down anytime [Browse On-Demand](https://cloud.vast.ai/create/)"
+  },
+  {
+    "url": "https://lambda.ai/pricing",
+    "title": "GPU cloud pricing: rent NVIDIA H100, H200, and B200 | Lambda",
+    "excerpt": "|Plan |VRAM/GPU |vCPUs |RAM |STORAGE |PRICE/GPU/HR\\* | |NVIDIA B200 SXM6 |180 GB |208 |2900 GiB |22 TiB SSD |$6.69 | |NVIDIA H100 SXM |80 GB |208 |1800 GiB |22 TiB SSD |$3.99 | |NVIDIA A100 SXM |80 GB |240 |1800 GiB |19\\.5 TiB SSD |$2.79 | |NVIDIA A100 SXM |40 GB |124 |1800 GiB |5\\.8 TiB SSD |$1.99 "
+  },
+  {
+    "url": "https://docs.mistral.ai/inference/pricing",
+    "title": "Pricing | Mistral Docs",
+    "excerpt": "|Model |Input |Cached input |Output | |Mistral Large 3 \u2197 |$0.5 |$0.05 |$1.5 |"
+  },
+  {
+    "url": "https://github.com/TauricResearch/TradingAgents",
+    "title": "GitHub - TauricResearch/TradingAgents: TradingAgents: Multi-Agents LLM Financial Trading Framework \u00b7 GitHub",
+    "excerpt": "TradingAgents is a multi-agent trading framework that mirrors the dynamics of real-world trading firms."
+  },
+  {
+    "url": "https://arxiv.org/html/2412.20138",
+    "title": "TradingAgents: Multi-Agents LLM Financial Trading Framework",
+    "excerpt": "We evaluate our TradingAgents framework using a comprehensive backtesting simulation from January 1st to March 29th, 2024, across major technology stocks including Apple, Nvidia, Microsoft, Meta, and Google."
+  },
+  {
+    "url": "https://gpu.consulting/gpu-rental-cost",
+    "title": "GPU Rental Cost 2026 | H100 Cost per Hour Compared",
+    "excerpt": "GPU rental prices per hour, by provider Indicative on-demand list prices in USD per GPU-hour, August 2026. Hyperscaler figures are derived per GPU from published instance rates. Reserved, spot and committed pricing is materially lower \u2014 see the commitment notes."
+  },
+  {
+    "url": "https://ai.google.dev/api/generate-content",
+    "title": "Generating content \u00a0|\u00a0 Gemini API \u00a0|\u00a0 Google AI for Developers",
+    "excerpt": "|``` { \"stopSequences\" : [ string ] , \"responseMimeType\" : string , \"responseSchema\" : { object ( `Schema` ) } , \"_responseJsonSchema\" : value , \"responseJsonSchema\" : value , \"responseModalities\" : enum ( `[Modality` ) ] , \"candidateCount\" : integer , \"maxOutputTokens\" : integer , \"temperature\" : n"
+  },
+  {
+    "url": "http://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing",
+    "title": "http://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing",
+    "excerpt": "See per-token pricing for the models available in GitHub Copilot and reference rates for additional usage across plans."
+  },
+  {
+    "url": "http://docs.z.ai/guides/overview/pricing",
+    "title": "http://docs.z.ai/guides/overview/pricing",
+    "excerpt": "Text Models Prices per 1M tokens."
+  },
+  {
+    "url": "https://computecomparison.com/provider/prime-intellect",
+    "title": "Prime Intellect GPU Pricing 2026 \u2014 H100, A100 & RTX Rates",
+    "excerpt": "0 GPU configurations available."
+  },
+  {
+    "url": "https://docs.mistral.ai/api/endpoint/chat",
+    "title": "Chat",
+    "excerpt": "random\\_seed \\# integer | null"
+  },
+  {
+    "url": "https://developers.openai.com/cookbook/examples/reproducible_outputs_with_the_seed_parameter",
+    "title": "How to make your completions outputs reproducible with the new seed parameter",
+    "excerpt": "**TLDR**: Developers can now specify `seed` parameter in the Chat Completion request to receive (mostly) consistent outputs."
+  },
+  {
+    "url": "https://artificialanalysis.ai/models/gpt-5-6-sol",
+    "title": "GPT-5.6 Sol (max) - Intelligence, Performance & Price Analysis | Artificial Analysis",
+    "excerpt": "GPT-5.6 Sol (max) generates output at 57.6 tokens per second (based on OpenAI's API), which is below average compared to other reasoning models in a similar price tier (median: 71.0 t/s)."
+  },
+  {
+    "url": "https://artificialanalysis.ai/models/nemotron-3-5-lightning",
+    "title": "Nemotron 3.5 Lightning - Intelligence, Performance & Price Analysis | Artificial Analysis",
+    "excerpt": "Nemotron 3.5 Lightning was created by NVIDIA."
+  },
+  {
+    "url": "https://gpurentalprices.com/providers/primeintellect",
+    "title": "Prime Intellect Pricing (September 2026): GPU Rental Rates + 5 Live Prices",
+    "excerpt": "Updated September 2026 \u00b7 day 70 of the ledger \u00b7 verified 2026-09-12 **The cheapest GPU on Prime Intellect right now is the H100 (unspecified) at $0.94/hr (spot / interruptible, verified 2026-09-12).** Compute marketplace aggregating multiple clouds; on-demand and spot. We track 5 live GPU offers acr"
+  }
+]

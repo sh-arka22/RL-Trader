@@ -1,0 +1,132 @@
+[
+  {
+    "url": "https://arxiv.org/abs/2502.07393",
+    "title": "[2502.07393] FinRL-DeepSeek: LLM-Infused Risk-Sensitive Reinforcement Learning for Trading Agents",
+    "excerpt": "**arXiv:2502.07393** (q-fin)"
+  },
+  {
+    "url": "https://aclanthology.org/2025.realm-1.12/",
+    "title": "Leveraging LLM-based sentiment analysis for portfolio optimization with proximal policy optimization - ACL Anthology",
+    "excerpt": "We introduce sentiment-augmented PPO (SAPPO), a reinforcement learning framework that incorporates real-time sentiment signals extracted from Refinitiv financial news. Daily sentiment scores are generated using LLaMA 3.3. SAPPO integrates these signals into the PPO advantage function via a sentiment"
+  },
+  {
+    "url": "https://github.com/Sidharth-bhat/HARLF-portfolio-optimization",
+    "title": "GitHub - Sidharth-bhat/HARLF-portfolio-optimization: #finance, #reinforcement-learning, #portfolio-optimization, #pytorch, #gymnasium",
+    "excerpt": "HARLF uses a **three-tier hierarchy** :"
+  },
+  {
+    "url": "https://github.com/benstaf/finRL_deepseek",
+    "title": "GitHub - benstaf/FinRL_DeepSeek: Code for the paper \"FinRL-DeepSeek: LLM-Infused Risk-Sensitive Reinforcement Learning for Trading Agents\" arXiv:2502.07393 \u00b7 GitHub",
+    "excerpt": "Description: Code for the paper \"FinRL-DeepSeek: LLM-Infused Risk-Sensitive Reinforcement Learning for Trading Agents\" arXiv:2502.07393 - benstaf/FinRL_DeepSeek"
+  },
+  {
+    "url": "https://github.com/Shafiya0101/signal-density-llm-trading",
+    "title": "GitHub - Shafiya0101/llm-rl-trading-multiseed: Multi-seed evaluation of an LLM-augmented PPO-CVaR reinforcement learning agent for Nasdaq-100 stock trading (2019-2023), with signal coverage sweep, ablation, and per-regime decomposition. \u00b7 GitHub",
+    "excerpt": "|Condition |Mean Return (%) |Std (%) |n seeds | |Full agent, full coverage |166\\.34 |21\\.66 |3 |"
+  },
+  {
+    "url": "https://aclanthology.org/2025.realm-1.12.pdf",
+    "title": "Leveraging LLM-based sentiment analysis for portfolio optimization with proximal policy optimization",
+    "excerpt": "We introduce sentiment-augmented PPO (SAPPO), a reinforcement learning framework that incorporates real-time sentiment signals ex- tracted from Refinitiv financial news. Daily sen- timent scores are generated using LLaMA 3.3. SAPPO integrates these signals into the PPO advantage function via a senti"
+  },
+  {
+    "url": "https://arxiv.org/html/2507.18560v1",
+    "title": "HARLF: Hierarchical Reinforcement Learning and Lightweight LLM-Driven Sentiment Integration for Financial Portfolio Optimization",
+    "excerpt": "Our three-tier architecture employs base RL agents to process hybrid data, meta-agents to aggregate their decisions, and a super-agent to merge decisions based on market data and sentiment analysis."
+  },
+  {
+    "url": "https://arxiv.org/html/2606.08450v1",
+    "title": "GIFT: LLM-Guided State-Reward Interface for Financial Reinforcement Learning",
+    "excerpt": "On the state side, raw OHLCV observations (open, high, low, close prices and trading volume) mainly record basic price-volume movements."
+  },
+  {
+    "url": "https://arxiv.org/html/2502.16789v1",
+    "title": "AlphaAgent: LLM-Driven Alpha Mining with Regularized Exploration to Counteract Alpha Decay",
+    "excerpt": "AlphaAgent employs GPT-3.5-turbo as the foundational LLM to support agents."
+  },
+  {
+    "url": "https://arxiv.org/html/2502.07393v1",
+    "title": "FinRL-DeepSeek: LLM-Infused Risk-Sensitive Reinforcement Learning for Trading Agents",
+    "excerpt": "arXiv:2502.07393v1 [q-fin.TR] 11 Feb 2025 FinRL-DeepSeek: LLM-Infused Risk-Sensitive Reinforcement Learning for Trading Agents"
+  },
+  {
+    "url": "https://ideas.repec.org/p/osf/socarx/nxvdp_v1.html",
+    "title": "When LLM Signals Hurt: A Coverage-Density Analysis of LLM-Augmented Reinforcement Learning for Stock Trading",
+    "excerpt": "We evaluate LLM-augmented reinforcement learning for stock trading on Nasdaq- 100 (2019\u20132023) and report a previously unmeasured experimental phenomenon: the relationship between LLM signal coverage density and trading performance is non-monotonic, with a clearly identifiable harmful regime."
+  },
+  {
+    "url": "https://arxiv.org/html/2402.03755",
+    "title": "QuantAgent: Seeking Holy Grail in Trading by Self-Improving Large Language Model",
+    "excerpt": "Furthermore, we instantiate this framework through an autonomous agent for mining trading signals named QuantAgent. Empirical results showcase QuantAgent\u2019s capability in uncovering viable financial signals and enhancing the accuracy of financial forecasts."
+  },
+  {
+    "url": "https://arxiv.org/html/2308.00016v2",
+    "title": "Alpha-GPT: Human-AI Interactive Alpha Mining for Quantitative Investment",
+    "excerpt": "In this work, we propose a new alpha mining paradigm by introducing human-AI interaction, and a novel prompt engineering algorithmic framework to implement this paradigm by leveraging the power of large language models."
+  },
+  {
+    "url": "https://arxiv.org/abs/2502.11433",
+    "title": "[2502.11433] FLAG-Trader: Fusion LLM-Agent with Gradient-based Reinforcement Learning for Financial Trading",
+    "excerpt": "To address this, we propose \\\\textsc{FLAG-Trader}, a unified architecture integrating linguistic processing (via LLMs) with gradient-driven reinforcement learning (RL) policy optimization, in which a partially fine-tuned LLM acts as the policy network, leveraging pre-trained knowledge while adapting"
+  },
+  {
+    "url": "https://arxiv.org/abs/2508.02366",
+    "title": "[2508.02366] Language Model Guided Reinforcement Learning in Quantitative Trading",
+    "excerpt": "This paper proposes a hybrid framework in which LLMs generate high-level trading strategies to guide RL agents."
+  },
+  {
+    "url": "https://github.com/Open-Finance-Lab/FinRL_Contest_2025",
+    "title": "GitHub - Open-Finance-Lab/FinRL_Contest_2025: FinRL Contest 2025 \u00b7 GitHub",
+    "excerpt": "Task 1 FinRL-DeepSeek for Stock Trading This task is about developing automated stock trading agents trained on stock prices and financial news data, by combining reinforcement learning and large language models (LLMs). The starter kit for Task 1 is [here](https://github.com/Open-Finance-Lab/FinRL_C"
+  },
+  {
+    "url": "https://arxiv.org/html/2504.02281v3",
+    "title": "FinRL Contests: Benchmarking Data-driven Financial Reinforcement Learning Agents",
+    "excerpt": "Financial reinforcement learning (FinRL) [1 , 2 , 3 , 4 , 5 , 6 , 7 ] is an interdisciplinary field that applies reinforcement learning algorithms to financial tasks, such as algorithmic trading [8 ] , portfolio management [ gu2023portfolio ] , option pricing [ vittori2021option ] , hedging, and mar"
+  },
+  {
+    "url": "https://open-finance-lab.github.io/FinAI_Contest_2025/",
+    "title": "Overview | FinAI Contest 2025",
+    "excerpt": "Task I FinRL-DeepSeek for Crypto Trading: This task is to develop crypto trading agents by integrating LLM-generated signals in FinRL, using financial news and market data."
+  },
+  {
+    "url": "https://aclanthology.org/2025.findings-acl.716.pdf",
+    "title": "aclanthology.org",
+    "excerpt": "pose FLAG-T RADER , a unified architecture in- tegrating linguistic processing (via LLMs) with gradient-driven reinforcement learning (RL) policy optimization, in which a partially fine- tuned LLM acts as the policy network, leverag- ing pre-trained knowledge while adapting to the financial domain t"
+  },
+  {
+    "url": "https://open-finance-lab.github.io/FinRL_Contest_2025/",
+    "title": "Overview | FinRL Contest 2025",
+    "excerpt": "This task is about developing automated stock trading agents trained on stock prices and financial news data by combining reinforcement learning and large language models (LLMs)."
+  },
+  {
+    "url": "https://arxiv.org/html/2502.11433",
+    "title": "FLAG-Trader: Fusion LLM-Agent with Gradient-based Reinforcement Learning for Financial Trading",
+    "excerpt": "To address this, we propose FLAG-Trader , a unified architecture integrating linguistic processing (via LLMs) with gradient-driven reinforcement learning (RL) policy optimization, in which a partially fine-tuned LLM acts as the policy network, leveraging pre-trained knowledge while adapting to the f"
+  },
+  {
+    "url": "https://arxiv.org/html/2508.02366v1",
+    "title": "Language Model Guided Reinforcement Learning in Quantitative Trading",
+    "excerpt": "This paper introduces a hybrid architecture that combines the long-term strategic reasoning capabilities of LLMs with the execution strengths of RL agents."
+  },
+  {
+    "url": "https://arxiv.org/abs/2606.08450",
+    "title": "[2606.08450] GIFT: LLM-Guided State-Reward Interface for Financial Reinforcement Learning",
+    "excerpt": "> Abstract: Financial portfolio trading is naturally formulated as a reinforcement learning problem, where an agent sequentially rebalances assets under changing market conditions to balance return, risk, and transaction costs. Yet in non-stationary markets, raw OHLCV states and short-horizon return"
+  },
+  {
+    "url": "https://arxiv.org/abs/2509.11420",
+    "title": "[2509.11420] Trading-R1: Financial Trading with LLM Reasoning via Reinforcement Learning",
+    "excerpt": "We present Trading-R1, a financially-aware model that incorporates strategic thinking and planning for comprehensive thesis composition, facts-grounded analysis, and volatility-adjusted decision making. Trading-R1 aligns reasoning with trading principles through supervised fine-tuning and reinforcem"
+  },
+  {
+    "url": "https://arxiv.org/html/2509.11420",
+    "title": "Trading-R1: Financial Trading with LLM Reasoning via Reinforcement Learning",
+    "excerpt": "Trading-R1 aligns reasoning with trading principles through supervised fine-tuning and reinforcement learning with a three-stage easy-to-hard curriculum."
+  },
+  {
+    "url": "https://link.springer.com/article/10.1007/s10115-025-02562-8",
+    "title": "Enhancing deep reinforcement learning for stock trading: a ...",
+    "excerpt": "This paper proposes a reward-shaping scheme that leverages expert feedback to guide the agent in making more informed trading decisions."
+  }
+]

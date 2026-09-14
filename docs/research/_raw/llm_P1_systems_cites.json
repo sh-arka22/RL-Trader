@@ -1,0 +1,312 @@
+[
+  {
+    "url": "https://arxiv.org/html/2502.13165v1",
+    "title": "HedgeAgents: A Balanced-aware Multi-agent Financial Trading System",
+    "excerpt": "While Large Language Models (LLMs) ... to explore a more robust and resilient framework. <strong>This paper introduces an innovative multi-agent system, HedgeAgents, aimed at bolstering system robustness via \u201chedging\u201d strategies</strong>."
+  },
+  {
+    "url": "https://arxiv.org/abs/2502.07393",
+    "title": "[2502.07393] FinRL-DeepSeek: LLM-Infused Risk-Sensitive Reinforcement Learning for Trading Agents",
+    "excerpt": "Abstract page for arXiv paper 2502.07393: FinRL-DeepSeek: <strong>LLM-Infused Risk-Sensitive Reinforcement Learning for Trading Agents</strong>"
+  },
+  {
+    "url": "https://arxiv.org/abs/2406.10811",
+    "title": "[2406.10811] LLMFactor: Extracting Profitable Factors through ...",
+    "excerpt": "In this study, we introduce a novel framework called LLMFactor, which employs Sequential Knowledge-Guided Prompting (SKGP) to identify factors that influence stock movements using LLMs."
+  },
+  {
+    "url": "https://arxiv.org/abs/2402.18485",
+    "title": "[2402.18485] A Multimodal Foundation Agent for Financial ...",
+    "excerpt": "To address these challenges, we present FinAgent, a multimodal foundational agent with tool augmentation for financial trading."
+  },
+  {
+    "url": "https://arxiv.org/abs/2407.06567",
+    "title": "[2407.06567] FinCon: A Synthesized LLM Multi-Agent System with Conceptual Verbal Reinforcement for Enhanced Financial Decision Making",
+    "excerpt": "From: Yangyang Yu [view email ] **[[v1]](/abs/2407.06567v1)** Tue, 9 Jul 2024 05:52:26 UTC (15,142 KB) **[[v2]](/abs/2407.06567v2)** Wed, 10 Jul 2024 06:59:18 UTC (14,713 KB) **[v3]** Thu, 7 Nov 2024 00:54:30 UTC (20,550 KB) Full-text links: Access Paper: View PDF Title: FinCon: A Synthesized LLM Mu"
+  },
+  {
+    "url": "http://arxiv.org/html/2509.09995",
+    "title": "QuantAgent: Price-Driven Multi-Agent LLMs for High-Frequency Trading",
+    "excerpt": "5 Results 5\\.1 Main Results In Table [1](https://arxiv.org/html/2509.09995v3.T1 \"Table 1 \u2023 4 Experiments \u2023 QuantAgent: Price-Driven Multi-Agent LLMs for High-Frequency Trading\") , we compare our agent-based LLM trader to the three baselines, Random Baseline, Linear Regression(LR) and XGBoost, across"
+  },
+  {
+    "url": "https://arxiv.org/html/2408.06361v1",
+    "title": "Large Language Model Agent in Financial Trading: A Survey",
+    "excerpt": "The design of memory and reflection can also find its root in cognitive science ( Chun and Johnson, 2011 ) ."
+  },
+  {
+    "url": "https://arxiv.org/html/2412.20138v7",
+    "title": "TradingAgents: Multi-Agents LLM Financial Trading Framework",
+    "excerpt": "TradingAgents is available at <https://github.com/TauricResearch/TradingAgents> ."
+  },
+  {
+    "url": "https://arxiv.org/html/2605.19337v1",
+    "title": "Agentic Trading: When LLM Agents Meet Financial Markets",
+    "excerpt": "From left to right: Prediction Models (e.g., FinBERT, StockBERT) perceive market information but lack decision-making capabilities; Signal Generators (e.g., AlphaGen, FactorMiner) add decision layers but remain non-executing; Partial Agents (e.g., FinVis-GPT without execution) incorporate memory but"
+  },
+  {
+    "url": "https://aclanthology.org/2025.findings-emnlp.972.pdf",
+    "title": "Large Language Model Agents in Finance: A Survey Bridging Research, Practice, and Real-World Deployment",
+    "excerpt": "**FinGPT (Yang et al., 2023a)** TS, EC, SA, TSF, SE, FD, DRP **Backbone** : ChatGLM, LLaMA, **Cost** : $300 per training LoRA and RL on stock prices Twitter, SEC Filings, Earnings Calls, Yahoo Finance **Innovations** : Full-stack open-source FinLLM framework with RL using stock price feedback."
+  },
+  {
+    "url": "http://arxiv.org/abs/2311.13743",
+    "title": "FinMem: A Performance-Enhanced LLM Trading Agent with Layered ...",
+    "excerpt": "It encompasses three core modules: Profiling, to customize the agent's characteristics; Memory, with layered message processing, to aid the agent in assimilating hierarchical financial data; and Decision-making, to convert insights gained from memories into investment decisions."
+  },
+  {
+    "url": "https://arxiv.org/abs/2309.03736",
+    "title": "[2309.03736] TradingGPT: Multi-Agent System with Layered ...",
+    "excerpt": "To bridge this gap, we introduce an innovative LLM multi-agent framework endowed with layered memories."
+  },
+  {
+    "url": "http://arxiv.org/abs/2608.13667",
+    "title": "Reasoning in Parallel as LLM Agents Act and Observe",
+    "excerpt": "by Z Sun \u00b7 2026 \u2014 Abstract:LLM agents in the ReAct paradigm alternate between reasoning, acting, and observing, but deliberate reasoning is confined to the Thought phase:"
+  },
+  {
+    "url": "https://arxiv.org/html/2502.16789v2",
+    "title": "AlphaAgent: LLM-Driven Alpha Mining with Regularized ...",
+    "excerpt": "This paper introduces AlphaAgent, a novel LLM-driven framework that effectively counteracts the critical challenge of alpha decay with three key regularization mechanisms: originality enforcement, complexity control, and hypothesis alignment."
+  },
+  {
+    "url": "https://arxiv.org/html/2510.02209v1",
+    "title": "StockBench: Can Llm Agents Trade Stocks Profitably In Real ...",
+    "excerpt": "We introduce StockBench, a novel benchmark for evaluating LLM agents in realistic stock-trading environment, directly measuring their profitability and risk-management capabilities."
+  },
+  {
+    "url": "https://arxiv.org/html/2411.00782v2",
+    "title": "TradExpert: Revolutionizing Trading with Mixture of Expert LLMs",
+    "excerpt": "This paper presents TradExpert, a novel framework that employs a mix of experts (MoE) approach, using four specialized LLMs, each analyzing distinct sources of financial data, including news articles, market data, alpha factors, and fundamental data."
+  },
+  {
+    "url": "https://arxiv.org/html/2406.06379v1",
+    "title": "FinVerse: An Autonomous Agent System for Versatile Financial ...",
+    "excerpt": "In this paper, we introduce FinVerse, a meticulously crafted agent system designed for a broad range of financial topics."
+  },
+  {
+    "url": "https://arxiv.org/abs/2402.09746",
+    "title": "[2402.09746] Alpha-GPT 2.0: Human-in-the-Loop AI for ...",
+    "excerpt": "Recently, we introduced a new paradigm for alpha mining in the realm of quantitative investment, developing a new interactive alpha mining system framework, Alpha-GPT."
+  },
+  {
+    "url": "https://arxiv.org/html/2407.18957v2",
+    "title": "When AI Meets Finance (StockAgent): Large Language Model ...",
+    "excerpt": "This study introduces StockAgent, an AI Agent framework driven by LLMs, designed to simulate stock trading in real-world environments."
+  },
+  {
+    "url": "http://arxiv.org/html/2510.11695v1",
+    "title": "When Agents Trade: Live Multi-Market Trading Benchmark for LLM Agents",
+    "excerpt": "In this work, we introduced AMA , the first continuously updating, multi class-asset benchmark for evaluating LLM-based trading agents in real time."
+  },
+  {
+    "url": "https://arxiv.org/html/2407.06567v2",
+    "title": "FinCon: A Synthesized LLM Multi-Agent System with Conceptual ...",
+    "excerpt": "In response to these unaddressed issues, we propose FinCon, an LLM-based multi-agent framework for critical financial decision-making tasks such as single stock trading and portfolio management."
+  },
+  {
+    "url": "https://arxiv.org/html/2502.07393v1",
+    "title": "FinRL-DeepSeek: LLM-Infused Risk-Sensitive Reinforcement Learning for Trading Agents",
+    "excerpt": "FinRL-DeepSeek: LLM-Infused Risk-Sensitive Reinforcement Learning for Trading Agents"
+  },
+  {
+    "url": "https://arxiv.org/html/2605.27887v3",
+    "title": "PortBench: A Correlation-Aware, Full-Pipeline Benchmarkfor LLM-Driven Portfolio Management",
+    "excerpt": "PortBench : A Correlation-Aware, Full-Pipeline Benchmark for LLM-Driven Portfolio Management"
+  },
+  {
+    "url": "https://arxiv.org/abs/2308.00016",
+    "title": "[2308.00016] Alpha-GPT: Human-AI Interactive Alpha Mining for ...",
+    "excerpt": "In this work, we propose a new alpha mining paradigm by introducing human-AI interaction, and a novel prompt engineering algorithmic framework to implement this paradigm by leveraging the power of large language models."
+  },
+  {
+    "url": "https://github.com/AI4Finance-Foundation/FinGPT",
+    "title": "GitHub - AI4Finance-Foundation/FinGPT: FinGPT: Open-Source ...",
+    "excerpt": "FinGPT: Open-Source Financial Large Language Models!"
+  },
+  {
+    "url": "https://github.com/The-FinAI/PIXIU",
+    "title": "GitHub - The-FinAI/PIXIU: This repository introduces PIXIU ...",
+    "excerpt": "This repository introduces PIXIU, an open-source resource featuring the first financial large language models (LLMs), instruction tuning data, and evaluation benchmarks to holistically assess financial LLMs."
+  },
+  {
+    "url": "https://arxiv.org/html/2405.14767v1",
+    "title": "FinRobot: An Open-Source AI Agent Platform for Financial ...",
+    "excerpt": "Recent applications of AI agents, such as FinAgent Zhang et al."
+  },
+  {
+    "url": "https://github.com/AI4Finance-Foundation/FinRobot",
+    "title": "GitHub - AI4Finance-Foundation/FinRobot: FinRobot: An Open ...",
+    "excerpt": "FinRobot is an AI Agent platform tailored for financial applications, surpassing FinGPT's single-model approach."
+  },
+  {
+    "url": "https://ai4finance-foundation.github.io/FinRobot/",
+    "title": "FinRobot: An Open-Source AI Agent Platform for Financial ...",
+    "excerpt": "FinRobot is an AI Agent platform tailored for financial applications, surpassing FinGPT\u2019s single-model approach."
+  },
+  {
+    "url": "https://github.com/effective-p/FinAgent/tree/main",
+    "title": "GitHub - effective-p/FinAgent: A Multimodal Foundation Agent ...",
+    "excerpt": "FinAgent A Multimodal Foundation Agent for Financial Trading A multimodal LLM trading agent based on the paper arxiv 2402.18485."
+  },
+  {
+    "url": "https://github.com/The-FinAI/FinCon",
+    "title": "GitHub - The-FinAI/FinCon",
+    "excerpt": "Contribute to The-FinAI/FinCon development by creating an account on GitHub."
+  },
+  {
+    "url": "https://github.com/TauricResearch/TradingAgents",
+    "title": "GitHub - TauricResearch/TradingAgents: TradingAgents: Multi ...",
+    "excerpt": "By deploying specialized LLM-powered agents: from fundamental analysts, sentiment experts, and technical analysts, to trader, risk management team, the platform collaboratively evaluates market conditions and informs trading decisions."
+  },
+  {
+    "url": "https://arxiv.org/abs/2407.18957",
+    "title": "[2407.18957] When AI Meets Finance (StockAgent): Large ...",
+    "excerpt": "We evaluate different LLMs under the framework of StockAgent in a stock trading environment that closely resembles real-world conditions."
+  },
+  {
+    "url": "https://dlnext.acm.org/doi/10.1145/3844605",
+    "title": "When AI Meets Finance (StockAgent): A Benchmark for ...",
+    "excerpt": "We have developed a multi-agent AI system, StockAgent, driven by LLMs and designed to systematically explore simulated trading behaviors in controlled environments."
+  },
+  {
+    "url": "https://github.com/MingyuJ666/Stockagent",
+    "title": "GitHub - MingyuJ666/Stockagent: [TIST] Large Language Model ...",
+    "excerpt": "We have developed a multi-agent AI system called StockAgent, driven by LLMs, designed to simulate investors' trading behaviors in response to the real stock market."
+  },
+  {
+    "url": "https://github.com/x9yang/Stockagent",
+    "title": "GitHub - x9yang/Stockagent",
+    "excerpt": "We have developed a multi-agent AI system called StockAgent, driven by LLMs, designed to simulate investors' trading behaviors in response to the real stock market."
+  },
+  {
+    "url": "https://arxiv.org/abs/2406.06379",
+    "title": "[2406.06379] FinVerse: An Autonomous Agent System for ...",
+    "excerpt": "Despite this growing interest, the development of stable and efficient agent systems poses substantial practical challenges."
+  },
+  {
+    "url": "https://arxiv.org/abs/2412.18174",
+    "title": "[2412.18174] INVESTORBENCH: A Benchmark for Financial ...",
+    "excerpt": "InvestorBench enhances the versatility of LLM-enabled agents by providing a comprehensive suite of tasks applicable to different financial products, including single equities like stocks, cryptocurrencies and exchange-traded funds (ETFs)."
+  },
+  {
+    "url": "https://arxiv.org/pdf/2412.18174",
+    "title": "arXiv:2412.18174v1 [cs.CE] 24 Dec 2024",
+    "excerpt": "In this section, we define a framework of the LLM-based agents in the INVESTORBENCH and formal-ize the financial decision-making tasks within the context of partially observable Markov decision process (POMDP) (Bertsekas and Shreve, 1996; Liu et al., 2020; Kabbani and Duman, 2022)."
+  },
+  {
+    "url": "https://arxiv.org/html/2412.18174v1",
+    "title": "InvestorBench: A Benchmark for Financial Decision-Making ...",
+    "excerpt": "In this paper, we conduct a holistic evaluation of 13 LLMs \u2014 including recent, competitive, and domain-specific fine-tuned models (see Table 1) to provide a broad overview of their reasoning capabilities in sequential decision-making tasks within financial contexts."
+  },
+  {
+    "url": "https://github.com/felis33/INVESTOR-BENCH",
+    "title": "GitHub - felis33/INVESTOR-BENCH",
+    "excerpt": "In this section, we provide a step-by-step guide to running the evaluation framework with the fine-tuned LLM."
+  },
+  {
+    "url": "https://ar5iv.labs.arxiv.org/html/2402.09746",
+    "title": "[2402.09746] Alpha-GPT 2.0: Human-in-the-Loop AI for ... - ar5iv",
+    "excerpt": "We established a comprehensive research workflow in Alpha-GPT 2.0, integrating alpha mining, modeling and analysis with iterative feedback, enriching quantitative investment research."
+  },
+  {
+    "url": "https://hedgeagents.github.io/",
+    "title": "GitHub Pages - HedgeAgents",
+    "excerpt": "The HedgeAgents framework simulates the architecture of a real hedge fund company, aiming to optimize risk hedging for multi-asset investment portfolios.The framework comprises four agents: Bitcoin Analyst Dave, Dow Jones Analyst Bob, Forex Analyst Emily, and Hedge Fund Manager Otto."
+  },
+  {
+    "url": "https://github.com/hedgeagents/hedgeagents.github.io",
+    "title": "hedgeagents.github.io",
+    "excerpt": "HedgeAgents: A Balanced-aware Multi-agent Financial Trading System - hedgeagents/hedgeagents.github.io"
+  },
+  {
+    "url": "https://github.com/benstaf/finRL_deepseek",
+    "title": "GitHub - benstaf/FinRL_DeepSeek: Code for the paper \"FinRL ...",
+    "excerpt": "Code for the paper \"FinRL-DeepSeek: LLM-Infused Risk-Sensitive Reinforcement Learning for Trading Agents\" arXiv:2502.07393 - benstaf/FinRL_DeepSeek"
+  },
+  {
+    "url": "https://github.com/bharatiwealth/finrl_deepseek",
+    "title": "GitHub - bharatiwealth/finrl_deepseek: Code for the paper ...",
+    "excerpt": "FinRL-DeepSeek: LLM-Infused Risk-Sensitive Reinforcement Learning for Trading Agents"
+  },
+  {
+    "url": "https://arxiv.org/abs/2502.16789",
+    "title": "[2502.16789] AlphaAgent: LLM-Driven Alpha Mining with ...",
+    "excerpt": "Extensive evaluations show that AlphaAgent outperforms traditional and LLM-based methods in mitigating alpha decay across bull and bear markets, consistently delivering significant alpha in Chinese CSI 500 and US S&P 500 markets over the past four years."
+  },
+  {
+    "url": "https://github.com/RndmVariableQ/AlphaAgent",
+    "title": "GitHub - RndmVariableQ/AlphaAgent: AlphaAgent is an ...",
+    "excerpt": "AlphaAgent A multi-factor equity research framework for China A-shares: build a daily panel from Tushare (or pre-packaged parquet caches), express factors in DSL (domain-specific language), evaluate them in FactorZoo, and optionally mine new factors with LLMs."
+  },
+  {
+    "url": "https://github.com/hongha5192-bit/AlphaAgent",
+    "title": "GitHub - hongha5192-bit/AlphaAgent: Multi-agent alpha factor ...",
+    "excerpt": "AlphaAgent is an autonomous framework that effectively integrates LLM agents for mining interpretable and decay-resistant alpha factors through three specialized agents."
+  },
+  {
+    "url": "https://arxiv.org/abs/2509.09995",
+    "title": "[2509.09995] QuantHarness: Price-Driven Multi-Agent LLMs for ...",
+    "excerpt": "Recent advances in Large Language Models (LLMs) have shown remarkable capabilities in financial reasoning and market understanding."
+  },
+  {
+    "url": "https://github.com/pillar/quantagent",
+    "title": "GitHub - pillar/quantagent: Official Repository for QuantAgent",
+    "excerpt": "Official Repository for QuantAgent."
+  },
+  {
+    "url": "https://github.com/remlih/QuantAgent",
+    "title": "GitHub - remlih/QuantAgent: Official Repository for QuantAgent",
+    "excerpt": "Official Repository for QuantAgent."
+  },
+  {
+    "url": "https://ieeexplore.ieee.org/document/11261453",
+    "title": "FinVerse Agent: Resource-Efficient Financial LLMs with ...",
+    "excerpt": "Abstract: This paper introduces FinVerse Agent, a taskadaptive financial AI system aligned with the objectives of the FinAI Contest 2025 Task 2."
+  },
+  {
+    "url": "https://github.com/ChenYXxxx/stockbench",
+    "title": "GitHub - ChenYXxxx/stockbench",
+    "excerpt": "Contribute to ChenYXxxx/stockbench development by creating an account on GitHub."
+  },
+  {
+    "url": "https://stockbench.github.io/",
+    "title": "STOCKBENCH - Evaluating LLMs in Realistic Stock Trading",
+    "excerpt": "To address this gap, we introduce StockBench, a contamination-free benchmark designed to evaluate LLM agents in realistic, multi-month stock trading environments."
+  },
+  {
+    "url": "https://github.com/AgenticFinLab/portbench",
+    "title": "GitHub - AgenticFinLab/portbench: code repo for PortBench: A ...",
+    "excerpt": "PortBench evaluates large language models on multi-asset portfolio management."
+  },
+  {
+    "url": "https://arxiv.org/pdf/2502.13165",
+    "title": "HedgeAgents: A Balanced-aware Multi-agent Financial Trading ...",
+    "excerpt": "We have integrated the LLM-based intelligent investment agent into a reinforcement learning framework through a reflection-driven decision-making process, enabling the flexible definition of the reasoning processes."
+  },
+  {
+    "url": "https://tauricresearch.github.io/TradingAgents/",
+    "title": "TradingAgents: Multi-Agents LLM Financial Trading Framework",
+    "excerpt": "TradingAgents framework is designed for research purposes."
+  },
+  {
+    "url": "https://github.com/pipiku915/FinMem-LLM-StockTrading",
+    "title": "GitHub - pipiku915/FinMem-LLM-StockTrading: FinMem: A ...",
+    "excerpt": "We then fine-tuned the agent's perceptual spans to achieve a significant trading performance."
+  },
+  {
+    "url": "https://gittrend.io/repo/benstaf/FinRL_DeepSeek",
+    "title": "FinRL_DeepSeek \u2014 Code for the paper \"FinRL-DeepSeek: L ...",
+    "excerpt": "Code for the paper \"FinRL-DeepSeek: LLM-Infused Risk-Sensitive Reinforcement Learning for Trading Agents\" arXiv:2502.07393 \u2605 320 stars on GitHub."
+  },
+  {
+    "url": "https://github.com/TanTaf/Finmem/tree/main",
+    "title": "GitHub - TanTaf/Finmem",
+    "excerpt": "An independent, from-scratch implementation of the architecture described in: Yu et al., \"FINMEM: A Performance-Enhanced LLM Trading Agent with Layered Memory and Character Design\" (arXiv:2311.13743)."
+  },
+  {
+    "url": "https://dl.acm.org/doi/10.1145/3800973.3801029",
+    "title": "Reproducibility in the TradingAgents Framework",
+    "excerpt": "We evaluate the TradingAgents framework \u2013 a multi-agent system for stock trading using GPT-4o and Qwen3:30B models with varying temperature, seed, and sampling parameters."
+  }
+]

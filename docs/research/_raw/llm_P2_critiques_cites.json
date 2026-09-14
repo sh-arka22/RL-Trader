@@ -1,0 +1,67 @@
+[
+  {
+    "url": "https://pm-research.com/content/iijpormgmt/40/5/94",
+    "title": "The Deflated Sharpe Ratio: Correcting for Selection Bias, Backtest Overfitting, and Non-Normality | Portfolio Management Research",
+    "excerpt": "The Deflated Sharpe Ratio: _Correcting for Selection Bias, Backtest_ _Overfitting, and Non-Normality_"
+  },
+  {
+    "url": "https://dl.acm.org/doi/10.1145/3800973.3801029",
+    "title": "Reproducibility in the TradingAgents Framework | Proceedings of the 2026 International Conference on Artificial Intelligence and Fintech",
+    "excerpt": "We evaluate the TradingAgents framework \u2013 a multi-agent system for stock trading using GPT-4o and Qwen3:30B models with varying temperature, seed, and sampling parameters. Trading Google stock over 3 months (May \u2013 July 2025), the Qwen3:30B-based system achieves mean cumulative returns of 18.1% \u00b1 2.8"
+  },
+  {
+    "url": "https://arxiv.org/html/2408.06361v1",
+    "title": "Large Language Model Agent in Financial Trading: A Survey",
+    "excerpt": "In this survey, we reviewed 27 papers that study using LLMs for financial trading with seven of which explicitly include the term \"agent\" in their titles."
+  },
+  {
+    "url": "https://arxiv.org/html/2510.07920",
+    "title": "Profit Mirage: Revisiting Information Leakage in LLM-based Financial Agents",
+    "excerpt": "Back-testing versus generalization (Section 2.1). By rolling the calendar forward we reveal that almost every published LLM-based agent fails to beat a random baseline once its knowledge cutoff is passed."
+  },
+  {
+    "url": "https://arxiv.org/pdf/2605.28359",
+    "title": "From Knowing to Doing: A Memory-Controlled Benchmark for LLM Trading Agents on Stock Markets",
+    "excerpt": "The task is daily portfolio construction over the CSI300 constituent universe. At each trading step the agent observes account state, current positions, last-step execution results, benchmark-relative per- 3 formance, and summary constraints, and must fi- nally emit a JSON action. Observations are _"
+  },
+  {
+    "url": "https://arxiv.org/html/2601.13770",
+    "title": "Look-Ahead-Bench: a Standardized Benchmark of Look-ahead Bias ...",
+    "excerpt": "This paper is a proof-of-concept of how Look-Ahead-Bench can serve as a diagnostic tool for look-ahead bias in financial LLMs."
+  },
+  {
+    "url": "https://www.sciencedirect.com/science/article/pii/S0950705124011110",
+    "title": "Backtest overfitting in the machine learning era: A ...",
+    "excerpt": "Despite the remarkable advancements in integrating statistical models and machine learning techniques into financial analysis, a significant gap persists in accurately assessing these models, particularly under the challenges of backtest overfitting and the dynamic nature of financial markets."
+  },
+  {
+    "url": "https://arxiv.org/pdf/2504.14765",
+    "title": "The Memorization Problem: Can We Trust LLMs' Economic Forecasts?",
+    "excerpt": "Abstract Large language models (LLMs) cannot be trusted for economic forecasts during pe-riods covered by their training data."
+  },
+  {
+    "url": "https://arxiv.org/abs/2504.14765",
+    "title": "[2504.14765] The Memorization Problem: Can We Trust LLMs ...",
+    "excerpt": "Large language models (LLMs) cannot be trusted for economic forecasts during periods covered by their training data. Counterfactual forecasting ability is non-identified when the model has seen the realized values: any observed output is consistent with both genuine skill and memorization. Any evide"
+  },
+  {
+    "url": "https://arxiv.org/html/2504.14765v1",
+    "title": "The Memorization Problem: Can We Trust LLMs\u2019 Economic Forecasts?",
+    "excerpt": "We provide the first systematic evaluation of LLMs\u2019 memorization of economic and financial data, including major economic indicators, news headlines, stock returns, and conference calls."
+  },
+  {
+    "url": "https://ar5iv.labs.arxiv.org/html/2601.13770",
+    "title": "[2601.13770] Look-Ahead-Bench: a Standardized Benchmark of ...",
+    "excerpt": "This paper is a proof-of-concept of how Look-Ahead-Bench can serve as a diagnostic tool for look-ahead bias in financial LLMs."
+  },
+  {
+    "url": "https://dl.acm.org/doi/10.1016/j.knosys.2024.112477",
+    "title": "Backtest overfitting in the machine learning era: : A ...",
+    "excerpt": "Through our analysis, we unveil the marked superiority of the Combinatorial Purged (CPCV) method in mitigating overfitting risks, outperforming traditional methods as evidenced by its lower Probability of Backtest Overfitting (PBO) and superior Deflated Sharpe Ratio (DSR) test statistic."
+  },
+  {
+    "url": "http://arxiv.org/pdf/2209.05559",
+    "title": "http://arxiv.org/pdf/2209.05559",
+    "excerpt": "Existing works may suffer from the backtest overfitting issue, which is a _false positive_ issue. Many methods (Liu et al. 2018, 2021b; Yang et al. 2020) adopted a walk- forward method and optimistically reported increased prof- its in backtesting. The walk-forward method divides data in a training-"
+  }
+]

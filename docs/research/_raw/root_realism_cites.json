@@ -1,0 +1,147 @@
+[
+ {
+  "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins/investor-bulletins/new-t1-settlement-cycle-what-investors-need-know-investor-bulletin",
+  "title": "New \u201cT+1\u201d Settlement Cycle \u2013 What Investors Need To Know ...",
+  "excerpt": "The SEC\u2019s Office of Investor Education and Advocacy (OIEA) is issuing this Investor Bulletin to explain the new \u201cT+1\u201d settlement cycle and how it will affect certain transactions you place with your brokerage firm."
+ },
+ {
+  "url": "https://www.ssga.com/library-content/products/factsheets/etfs/us/factsheet-us-en-spy.pdf",
+  "title": "Fact Sheet:State Street\u00ae SPDR\u00ae S&P 500\u00ae ETF Trust, Jun2026",
+  "excerpt": "Morningstar Return is measured for up to three time periods (three, five, and 10 years). These separate measures are then weighted and averaged to produce an overall measure for the product."
+ },
+ {
+  "url": "https://ai4finance.org/FinRL-Paper.pdf",
+  "title": "FinRL-X: An AI-Native Modular Infrastructure for Quantitative ...",
+  "excerpt": "FinRL-X Framework: A layered, end-to-end trading architecture that unifies data processing, strategy construction, backtesting, and broker-integrated execution within a consistent pipeline, illustrating the workflow from data ingestion to live execution."
+ },
+ {
+  "url": "https://www.finra.org/rules-guidance/guidance/trading-activity-fee",
+  "title": "Trading Activity Fee - FINRA.org",
+  "excerpt": "The guidance in this FAQ addresses general questions about the TAF, as well as specific questions about reporting the TAF for equity, debt, options and futures transactions."
+ },
+ {
+  "url": "http://papers.ssrn.com/sol3/papers.cfm?abstract_id=2326253",
+  "title": "The Probability of Backtest Overfitting by David H. Bailey, Jonathan Borwein, Marcos Lopez de Prado, Qiji Jim Zhu :: SSRN",
+  "excerpt": "We propose a framework that estimates the probability of backtest over-fitting (PBO) specifically in the context of investment simulations, through a numerical method that we call combinatorially symmetric cross-validation (CSCV)."
+ },
+ {
+  "url": "https://rpc.cfainstitute.org/research/financial-analysts-journal/2002/the-statistics-of-sharpe-ratios",
+  "title": "The Statistics of Sharpe Ratios - CFA Institute",
+  "excerpt": "The building blocks of the Sharpe ratio\u2014expected returns and volatilities\u2014are unknown quantities that must be estimated statistically and are, therefore, subject to estimation error."
+ },
+ {
+  "url": "https://www.mdpi.com/2227-7072/12/2/55",
+  "title": "Constant Leverage Covering Strategy for Equity Momentum ...",
+  "excerpt": "Researchers who ignore the negative effects of transaction costs have praised the momentum portfolio for exhibiting a Sharpe ratio that is more than 35% greater than that of the stock market, as seen in Table 2."
+ },
+ {
+  "url": "https://portfolioslab.com/symbol/SPY/sharpe-ratio",
+  "title": "State Street SPDR S&P 500 ETF (SPY) Sharpe Ratio: 1.37",
+  "excerpt": "Data shows 1-, 5-, and 10-year periods, plus each fund's all-time average, as of Sep 13, 2026."
+ },
+ {
+  "url": "https://www.davidhbailey.com/dhbpapers/deflated-sharpe.pdf",
+  "title": "THE DEFLATED SHARPE RATIO: CORRECTING FOR ... - David H. Bailey",
+  "excerpt": "The Deflated Sharpe Ratio (DSR) corrects for two leading sources of performance inflation: Selection bias under multiple testing and non-Normally distributed returns."
+ },
+ {
+  "url": "http://openfin.engineering.columbia.edu/sites/openfin.engineering.columbia.edu/files/content/publications/ensemble.pdf",
+  "title": "http://openfin.engineering.columbia.edu/sites/openfin.engineering.columbia.edu/files/content/publications/ensemble.pdf",
+  "excerpt": "In this paper we retrain our three agents at every three months. **Step 2** ."
+ },
+ {
+  "url": "http://finra.org/rules-guidance/notices/26-10",
+  "title": "Regulatory Notice 26-10 | FINRA.org",
+  "excerpt": "The effective date of the amendments is June 4, 2026, 45 days from publication of this _Notice_ ."
+ },
+ {
+  "url": "http://docs.lhpedersen.com/TimeSeriesMomentum.pdf",
+  "title": "Time series momentum - docs.lhpedersen.com",
+  "excerpt": "Sample period is January 1985 to December 2009."
+ },
+ {
+  "url": "https://arxiv.org/html/2011.09607v1",
+  "title": "FinRL: A Deep Reinforcement Learning Library for Automated Stock Trading in Quantitative Finance",
+  "excerpt": "arXiv:2011.09607v1 [q-fin.TR] 19 Nov 2020"
+ },
+ {
+  "url": "https://arxiv.org/pdf/2511.12120",
+  "title": "Deep Reinforcement Learning for Automated Stock Trading: An Ensemble Strategy",
+  "excerpt": "Deep Reinforcement Learning for Automated Stock Trading: An Ensemble Strategy Hongyang Yang \u00b9 , Xiao-Yang Liu \u00b2 , Shan Zhong \u00b2 , and Anwar Walid \u00b3"
+ },
+ {
+  "url": "https://www.finra.org/rules-guidance/rule-filings/sr-finra-2024-019/fee-adjustment-schedule",
+  "title": "FINRA Fee Adjustment Schedule | FINRA.org",
+  "excerpt": "|Security Type |2024 |2025 (no change) |2026 |2027 |2028 |2029 | |Covered Equity Security |$0.000166 per share (up to $8.30 max per trade) |"
+ },
+ {
+  "url": "https://www.sec.gov/files/risk-alert-tplus1-032724.pdf",
+  "title": "Shortening the Securities Transaction Settlement Cycle",
+  "excerpt": "On May 28, 2024, the standard settlement cycle for most broker-dealer transactions in U.S. securities will shorten from two business days after the trade date (\u201cT+2\u201d) to one business day after the trade date (\u201cT+1\u201d), pursuant to the"
+ },
+ {
+  "url": "https://www.sec.gov/rules-regulations/fee-rate-advisories/2026-2",
+  "title": "SEC.gov | Section 31 Transaction Fee Rate Advisory for Fiscal Year 2026",
+  "excerpt": "27, 2026** \u2014 The Securities and Exchange Commission today announced that starting on April 4, 2026, the fee rates applicable to most securities transactions will be set at $20.60 per million dollars."
+ },
+ {
+  "url": "https://www.nasdaq.com/articles/sampling-sp-500-minimize-spreads",
+  "title": "Sampling the S&P 500 to Minimize Spreads | Nasdaq",
+  "excerpt": "May 30, 2024 \u2014 05:18 pm EDT"
+ },
+ {
+  "url": "http://fidelity.com/learning-center/trading-investing/trading/avoiding-cash-trading-violations",
+  "title": "Avoiding Cash Account Trading Violations - Fidelity",
+  "excerpt": "A cash account requires you pay for all purchases in full by the settlement date."
+ },
+ {
+  "url": "https://www.mdpi.com/2306-5729/6/11/119",
+  "title": "Deep Reinforcement Learning for Trading\u2014A Critical Survey",
+  "excerpt": "Inconsistency of data used: Almost all papers use different datasets, so it is hard to compare between them. Even if using the same assets (such as Bitcoin), the periods used are different, but in general, the assets are significantly different."
+ },
+ {
+  "url": "https://link.springer.com/article/10.1007/s11408-023-00433-2",
+  "title": "The predictive ability of technical trading rules: an empirical analysis of developed and emerging equity markets | Financial Markets and Portfolio Management | Springer Nature Link",
+  "excerpt": "For each market, we divide the sample periods into 36 month subperiods and select the trading rules with the best performance in terms of the highest excess Sharpe ratio (we refer to these 36 month intervals in which in-sample performance of technical trading rules is evaluated as \u201ctesting periods\u201d)"
+ },
+ {
+  "url": "https://onlinelibrary.wiley.com/doi/full/10.1111/jofi.13467",
+  "title": "The \u201cActual Retail Price\u201d of Equity Trades - SCHWARZ - 2025 - The Journal of Finance - Wiley Online Library",
+  "excerpt": "Because executing trades is costly, we were unable to trade the entire universe of stocks, which included 4,037 names on the Center for Research in Security Prices (CRSP) database as of June 2021."
+ },
+ {
+  "url": "https://pages.stern.nyu.edu/~afrazzin/pdf/Trading%20Cost%20of%20Asset%20Pricing%20Anomalies%20-%20Frazzini,%20Israel%20and%20Moskowitz.pdf",
+  "title": "Trading Costs of Asset Pricing Anomalies",
+  "excerpt": "We report returns of value (HML), Size (SMB), momentum (UMD), reversal (STR), a 50-50 portfolio of UMD and HML (VALMOM) and a composite portfolio (COMBO) that puts equal weights in SMB, HML, UMD and STR. All the portfolios are the intersections of two portfolios formed on size and three portfolios f"
+ },
+ {
+  "url": "https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html",
+  "title": "New Home Page",
+  "excerpt": "Updated: January 5, 2026"
+ },
+ {
+  "url": "https://traders.studentorg.berkeley.edu/papers/The-Statistics-of-Sharpe-Ratios.pdf",
+  "title": "The Statistics Of Sharpe Ratios",
+  "excerpt": "_T_ SR \u2013 SR ( ) ~ _a_ _N_ 0 _V_ _IID_ ( , ) ,"
+ },
+ {
+  "url": "https://arxiv.org/html/2505.16099v2",
+  "title": "Reinforcement Learning for Stock Transactions",
+  "excerpt": "arXiv:2505.16099v2 [cs.LG] 24 May 2025"
+ },
+ {
+  "url": "https://www.finra.org/investors/insights/intraday-margin-requirements",
+  "title": "Understanding the New Intraday Margin Requirements - FINRA.org",
+  "excerpt": "Under the new requirements, you must hold adequate maintenance margin\u2014a minimum equity level of 25 percent of the current market value of the long margin-eligible equity securities in your margin account\u2014throughout the entire trading day, not just at end of the day."
+ },
+ {
+  "url": "https://www.schwab.com/node/14936",
+  "title": "Pricing: $0 commissions on online stock, ETF, and options trades | Charles Schwab",
+  "excerpt": "|Standard online stock and options commissions \u00b9 |$0 |"
+ },
+ {
+  "url": "https://www.fidelity.com/trading/commissions-margin-rates",
+  "title": "Trading Commissions and Margin Rates | Fidelity",
+  "excerpt": "$0 commissions for online US stock, ETF, and option trades."
+ }
+]

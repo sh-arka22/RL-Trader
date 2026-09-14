@@ -1,0 +1,47 @@
+[
+  {
+    "url": "https://arxiv.org/abs/2503.16252",
+    "title": "[2503.16252] Fin-R1: A Large Language Model for Financial ...",
+    "excerpt": "Its development follows a two-stage pipeline."
+  },
+  {
+    "url": "https://arxiv.org/pdf/2507.18417",
+    "title": "FinDPO: Financial Sentiment Analysis for Algorithmic Trading ...",
+    "excerpt": "In this way, simulations demonstrate that FinDPO is the first sentiment-based approach to maintain substantial positive returns of 67% annually and strong risk-adjusted performance, as indicated by a Sharpe ratio of 2.0, even under realistic transaction costs of 5 basis points (bps)."
+  },
+  {
+    "url": "https://arxiv.org/html/2306.06031v2",
+    "title": "FinGPT: Open-Source Financial Large Language Models",
+    "excerpt": "Similarly, we can substitute Reinforcement Learning on Stock Prices (RLSP) for Reinforcement Learning on Human feedback, as utilized by ChatGPT."
+  },
+  {
+    "url": "https://openreview.net/pdf?id=KBC0xQJ4uz",
+    "title": "FinRankGRPO: Optimizing LLMs for Listwise Financial Asset ...",
+    "excerpt": "To bridge this gap, we propose FinRankGRPO, a framework that shifts LLM-based portfolio construction from direct numerical prediction to listwise ranking of financial assets."
+  },
+  {
+    "url": "https://ar5iv.labs.arxiv.org/html/2504.13125",
+    "title": "[2504.13125] LLMs Meet Finance: Fine-Tuning Foundation Models for the Open FinLLM Leaderboard \u2020These authors contributed equally to this work. *Corresponding author: Haizhao Yang hzyang@umd.edu.",
+    "excerpt": "Supervised Fine-Tuning (SFT) SFT is mainly used for alignment, task adaptation, and knowledge enhancement. Therefore, we always start with SFT. Among all 41 datasets, 28 provide training/validation data, and we use these data for SFT."
+  },
+  {
+    "url": "https://arxiv.org/html/2503.16252v1",
+    "title": "Fin-R1: A Large Language Model for Financial Reasoning through Reinforcement Learning",
+    "excerpt": "In the data generation phase, we employ data distillation based on DeepSeek-R1 and a data filtering method using llm-as-judge ( Xu et al., 2023 ) to create a high-quality financial reasoning dataset, Fin-R1-Data. In the model training phase, we establish the financial reasoning model Fin-R1 based on"
+  },
+  {
+    "url": "https://arxiv.org/html/2509.11420v1",
+    "title": "Trading-R1: Financial Trading with LLM Reasoning via Reinforcement Learning",
+    "excerpt": "To extract high-quality, long-form reasoning without hosting massive models ourselves, we propose a method for synthetically reconstructing reasoning paths from these black-box models. As illustrated in Figure 2a , we begin by inputting structured financial data for a specific ticker on a given date"
+  },
+  {
+    "url": "https://arxiv.org/html/2507.18417v1",
+    "title": "FinDPO: Financial Sentiment Analysis for Algorithmic Trading through Preference Optimization of LLMs",
+    "excerpt": "As DPO requires preference pairs rather than class labels , we converted those three datasets into synthetic pairwise preference data."
+  },
+  {
+    "url": "https://tauric.ai/research/trading-r1",
+    "title": "Trading-R1: Financial Trading with LLM Reasoning via Reinforcement Learning | Tauric Research",
+    "excerpt": "Trading-R1 (full model), reported metrics: |Asset |CR% \u2191 |SR \u2191 |HR% \u2191 |MDD% \u2193 | |NVDA |8\\.08 |2\\.72 |70\\.0 |3\\.80 | |AAPL |5\\.82 |1\\.80 |63\\.6 |3\\.68 | |MSFT |2\\.38 |0\\.87 |60\\.4 |1\\.90 | |AMZN |5\\.39 |1\\.72 |63\\.0 |3\\.20 | |META |5\\.12 |0\\.86 |50\\.0 |4\\.65 | |SPY |3\\.34 |1\\.60 |64\\.0 |1\\.52 |"
+  }
+]
