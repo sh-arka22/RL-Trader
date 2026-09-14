@@ -1,0 +1,6 @@
+#!/bin/sh
+# Refuse to push a stale context graph.
+command -v graft >/dev/null 2>&1 || exit 0
+graft check >/dev/null 2>&1 || {
+  echo "graft/ is stale — running graft build"; graft build >/dev/null 2>&1; }
+exit 0

@@ -2,7 +2,12 @@ __pycache__/
 *.pyc
 .venv/
 .env
-data/
+/data/                 # dataset artefacts at repo root ONLY.
+                       # NOT bare `data/` — that also matches rltrader/data/ (the source
+                       # package) and silently excludes it from git. Caught by graft, 2026-09-14.
 wandb/
 .DS_Store
 *.ipynb_checkpoints
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/

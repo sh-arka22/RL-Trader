@@ -1,0 +1,6 @@
+#!/bin/sh
+# Keep the graft context graph in sync with the code after every commit.
+# Enabled by: git config core.hooksPath .githooks
+command -v graft >/dev/null 2>&1 || exit 0
+graft build >/dev/null 2>&1 &
+exit 0
