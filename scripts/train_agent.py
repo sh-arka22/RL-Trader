@@ -57,16 +57,20 @@ def split(df: pd.DataFrame):
 
 def main() -> int:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--algo", choices=["ppo", "td3"], default="ppo")
     ap.add_argument("--cost-level", choices=list(COST_BY_NAME), default="realistic")
     ap.add_argument("--seeds", nargs="+", type=int, default=[0])
     ap.add_argument("--timesteps", type=int, default=100_000)
     ap.add_argument("--lookback", type=int, default=20)
     ap.add_argument("--l1-penalty", type=float, default=0.0)
     ap.add_argument("--turbulence-threshold", type=float, default=None)
+    ap.add_argument("--learning-rate", type=float, default=3e-4)
+    ap.add_argument("--n-steps", type=int, default=2048, help="PPO only")
+    ap.add_argument("--batch-size", type=int, default=64)
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
 
-    from stable_baselines3 import PPO
+    from stable_baselines3 import PPO, TD3
     from rltrader.eval.metrics import summary
 
     cost_model = COST_BY_NAME[a.cost_level]
@@ -89,16 +93,33 @@ def main() -> int:
                                lookback=a.lookback, l1_penalty=a.l1_penalty,
                                turbulence_threshold=a.turbulence_threshold)
         train_env.reset(seed=seed)
-        model = PPO("MlpPolicy", train_env, seed=seed, verbose=0,
-                    n_steps=2048, batch_size=64, gamma=0.99, learning_rate=3e-4)
+        # TD3 (ARCHITECTURE.md's designated PPO challenger) needs action noise for
+        # exploration on a continuous action space -- PPO's stochastic policy provides
+        # its own exploration and does not use this.
+        if a.algo == "td3":
+            from stable_baselines3.common.noise import NormalActionNoise
+            n_actions = train_env.action_space.shape[0]
+            noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
+            # SB3's TD3 default buffer_size=1_000_000 pre-allocates ~1M x (2*obs_dim+action_dim+2)
+            # float32 transitions on construction -- for our ~106-dim observation that is under a
+            # second normally, but combined with a small train env of only ~1,750 steps it is a
+            # wasteful default by ~570x. Sized to a few full passes over the training episode instead.
+            buffer_size = min(200_000, a.timesteps * 4)
+            model = TD3("MlpPolicy", train_env, seed=seed, verbose=0,
+                       batch_size=a.batch_size, gamma=0.99, learning_rate=a.learning_rate,
+                       action_noise=noise, buffer_size=buffer_size, learning_starts=200)
+        else:
+            model = PPO("MlpPolicy", train_env, seed=seed, verbose=0,
+                       n_steps=a.n_steps, batch_size=a.batch_size, gamma=0.99,
+                       learning_rate=a.learning_rate)
         model.learn(total_timesteps=a.timesteps)
         train_secs = time.time() - t0
 
-        tag = f"{a.cost_level}_seed{seed}_{a.timesteps}"
-        model_path = models_dir / f"ppo_{tag}.zip"
+        tag = f"{a.algo}_{a.cost_level}_seed{seed}_{a.timesteps}"
+        model_path = models_dir / f"{a.algo}_{tag}.zip"
         model.save(model_path)
 
-        strat = PPOStrategy(model, lookback=a.lookback, tag=tag)
+        strat = PPOStrategy(model, lookback=a.lookback, tag=tag)   # SB3 predict() API is shared
         adv_te2, vol_te2 = liquidity_inputs(store, FIVE, close_te.index)  # rolling stats reset at test start
         r = evaluate(strat, close_te, opn_te, adv_te2, vol_te2, log=log,
                     levels=[cost_model], warmup=a.lookback,
