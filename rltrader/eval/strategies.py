@@ -100,3 +100,23 @@ class PlantedOracle:
             if r_next[i] > 0:
                 w[i] = 1.0 / self.top_k
         return w
+
+
+class RandomWeightPolicy:
+    """A12: the sanity floor. Any trained agent must beat THIS with a CI excluding 0,
+    or its apparent skill cannot be distinguished from noise (PLAN.md S4 exit criteria).
+    """
+    name = "random_weight_A12"
+
+    def __init__(self, n: int, seed: int = 0, max_gross: float = 1.0):
+        self.n, self.max_gross = n, max_gross
+        self.rng = np.random.default_rng(seed)
+
+    def fit(self, train: pd.DataFrame) -> None:
+        pass
+
+    def weights(self, history: pd.DataFrame, held: np.ndarray) -> np.ndarray:
+        logits = self.rng.normal(size=self.n + 1)
+        e = np.exp(logits - logits.max())
+        w = (e / e.sum())[:-1] * self.max_gross
+        return w

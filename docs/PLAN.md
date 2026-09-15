@@ -97,9 +97,19 @@ documented explanation for every outlier.
 
 ---
 
-## S4 — Core RL agent
+## S4 — Core RL agent ⚠️ DONE, VERDICT: FAIL (2026-09-15)
 
 **Goal** A price-only PPO that is a *credible control*, not a winner.
+
+**Result** 20 seeds x 3 cost levels trained and evaluated OOS (2022-2026). IQM Sharpe
+0.92-0.96, but **statistically indistinguishable from the A12 random-weight sanity floor**
+(0.915, overlapping CIs) and behind momentum/equal-weight. The pre-registered three-gate
+verdict (DM + DSR>0.95 + seed lower bound>0) **FAILS even for the single best-of-20 seed**
+(2 of 3 gates) and fails all three for the median seed. See `docs/reports/S4_AGENT.md`
+for the full result, the A12 comparison, and the options for how to proceed (S6/S7 anyway
+with this as the control; TD3/reward-shaping first; or scope to S9's fuller universe
+protocol). This is a legitimate, plan-consistent, honestly-reported outcome, not a defect
+in the pipeline — `RESEARCH.md` named this range of result as likely before S2 began.
 **Entry** S3 exit met; S3b green.
 **Work** custom ~400-LOC Gymnasium env (6-dim simplex action, t+1 open fills, ADV cap, turnover
 penalty); `check_env` with seeding; PPO primary, TD3 challenger; walk-forward with embargo;

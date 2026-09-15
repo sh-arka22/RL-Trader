@@ -91,3 +91,37 @@ def test_turbulence_gate_forces_cash(panels):
     if env._t > 10 + 61:
         assert info["turbulence_triggered"]
         assert abs(info["weights"][-1] - 1.0) < 1e-9   # all cash
+
+
+def test_env_level_planted_oracle_is_detected(panels):
+    """PLAN.md S4 exit criterion: 'Planted-oracle test on our env: Detected.'
+
+    A policy fed the ANSWER via a side channel (never through env.step's real
+    observation) must score far above every honest policy trained in the same
+    environment -- proof that if a real leak entered the env, this check would see it.
+    """
+    close, opn, adv, vol = panels
+    from rltrader.envs.trading_env import softmax_with_cash, ACTION_SCALE
+    env = TradingEnv(close, opn, adv, vol, C.FREE, lookback=10)
+    obs, _ = env.reset(seed=0)
+    total = 0.0
+    for _ in range(len(close) - 12):
+        t = env._t
+        future_r = (opn.iloc[t + 2].to_numpy() / opn.iloc[t + 1].to_numpy() - 1.0)
+        # cheat: pick the single best asset for the return the env is about to score
+        cheat_logits = np.full(env.n, -5.0, dtype="float32")
+        cheat_logits[int(np.argmax(future_r))] = 5.0
+        obs, r, term, trunc, info = env.step(cheat_logits)
+        total += r
+        if term:
+            break
+    honest_env = TradingEnv(close, opn, adv, vol, C.FREE, lookback=10)
+    honest_env.reset(seed=0)
+    honest_total = 0.0
+    rng = np.random.default_rng(0)
+    for _ in range(len(close) - 12):
+        obs, r, term, trunc, info = honest_env.step(rng.uniform(-1, 1, size=honest_env.n).astype("float32"))
+        honest_total += r
+        if term:
+            break
+    assert total > honest_total + 1.0, (total, honest_total)
