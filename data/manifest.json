@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-14T23:49:18.573676+00:00",
+  "generated_at": "2026-09-15T00:09:38.541257+00:00",
   "python": "3.13.8",
   "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
   "n_files": 130,
@@ -540,9 +540,10 @@
     {
       "name": "G1_coverage",
       "passed": true,
-      "detail": "0 missing sessions for every ticker/provider",
+      "detail": "0 missing of 2941 expected sessions (2015-01-01 -> 2026-09-14) for every ticker/provider",
       "data": {
-        "bad": {}
+        "bad": {},
+        "expected_sessions": 2941
       }
     },
     {
@@ -556,7 +557,7 @@
     {
       "name": "G3_reconcile",
       "passed": true,
-      "detail": "worst median divergence 0.0004 bp (tol 1.0); independence: INDEPENDENT_LIKELY \u2014 only 3.4886% of bars are bit-identical \u2014 sources round/clean differently",
+      "detail": "n=5 worst median 0.0004 / p95 1.403 / max 17.513 bp; independence: INDEPENDENT_LIKELY \u2014 only 3.4886% of bars are bit-identical \u2014 sources round/clean differently",
       "data": {
         "rows": [
           {
@@ -619,21 +620,28 @@
           "verdict": "INDEPENDENT_LIKELY",
           "detail": "only 3.4886% of bars are bit-identical \u2014 sources round/clean differently",
           "mean_frac_bit_identical": 0.03488609316558993
+        },
+        "tolerance": {
+          "median_bps": 1.0,
+          "p95_bps": 5.0,
+          "max_bps": 25.0,
+          "frac_over_1bp": 0.15
         }
       }
     },
     {
       "name": "G4_point_in_time",
       "passed": true,
-      "detail": "no future bar visible at any probe instant",
+      "detail": "29410 bar stamps and every action stamp verified against the exchange calendar; none is knowable before its own session close",
       "data": {
-        "leaks": []
+        "problems": [],
+        "n_rows_checked": 29410
       }
     },
     {
       "name": "G5_corporate_actions",
       "passed": true,
-      "detail": "worst median split-adjusted return divergence 0.0004 bp (tol 1.0)",
+      "detail": "recomputed total return vs vendor adjusted close: n=5 worst median 0.0004 / p95 0.008 / max 17.928 bp",
       "data": {
         "rows": [
           {
@@ -676,13 +684,19 @@
             "max_bps": 0.001175780066642318,
             "n_over_1bp": 0
           }
-        ]
+        ],
+        "tolerance": {
+          "median_bps": 1.0,
+          "p95_bps": 5.0,
+          "max_bps": 25.0,
+          "frac_over_1bp": 0.15
+        }
       }
     },
     {
       "name": "G7_printed_prices",
       "passed": true,
-      "detail": "un-adjusted closes match the tape on 3 split anchors",
+      "detail": "un-adjusted closes match the tape on 6 split anchors",
       "data": {
         "rows": [
           {
@@ -708,6 +722,30 @@
             "printed": 499.23,
             "diff_bps": 0.0002200654629491438,
             "stored": 124.80750274658203
+          },
+          {
+            "ticker": "NVDA",
+            "date": "2024-06-10",
+            "recovered": 121.79000091552734,
+            "printed": 121.79,
+            "diff_bps": 7.51726198782514e-05,
+            "stored": 121.79000091552734
+          },
+          {
+            "ticker": "TSLA",
+            "date": "2022-08-25",
+            "recovered": 296.07000732421875,
+            "printed": 296.07,
+            "diff_bps": 0.00024738132052626777,
+            "stored": 296.07000732421875
+          },
+          {
+            "ticker": "AAPL",
+            "date": "2020-08-31",
+            "recovered": 129.0399932861328,
+            "printed": 129.04,
+            "diff_bps": 0.0005202934888051706,
+            "stored": 129.0399932861328
           }
         ]
       }

@@ -42,9 +42,33 @@ def test_unadjust_recovers_the_printed_price():
     assert tr.loc[0, "traded_volume"] == 5e5
 
 
-def test_unadjustment_is_point_in_time():
-    before = unadjust_factors(_bars(), _split("2020-06-15"), as_of=pd.Timestamp("2020-06-14", tz="UTC"))
-    assert (before == 1.0).all(), "a future split leaked into a past knowledge state"
+def test_unadjustment_ignores_the_backtest_clock():
+    """Un-adjustment reverses what the VENDOR baked in, so it follows the data vintage,
+    not the simulated present. Gating it on as_of (the original behaviour) returned
+    109.63 for NVDA 2024-05-31 at as_of=2024-06-01 when the tape printed 1096.33 —
+    the exact 10x position-sizing error this module exists to prevent. Finding H1.
+
+    This is NOT a look-ahead leak: the split ratio is used only to restate a price that
+    was already public, never to reveal a fact about the future. What a backtest may SEE
+    is controlled by Store.bars(as_of=...); what a price MEANS is controlled here."""
+    early = unadjust_factors(_bars(), _split("2020-06-15"), as_of=pd.Timestamp("2020-06-14", tz="UTC"))
+    late = unadjust_factors(_bars(), _split("2020-06-15"), as_of=NOW)
+    assert early.equals(late)
+    assert early.loc[dt.date(2020, 6, 12)] == 2.0
+
+
+def test_two_providers_reporting_one_split_do_not_double_count():
+    """Finding L1/M3: without dedupe this gives 4.0 and a +90,000 bp price error."""
+    both = pd.concat([_split(), _split()], ignore_index=True)
+    assert unadjust_factors(_bars(), both).loc[dt.date(2020, 6, 12)] == 2.0
+
+
+def test_dividend_factor_is_exactly_one_at_the_last_bar():
+    """Finding M4: an action dated past the final bar rescaled the whole series."""
+    late_div = pd.DataFrame([{"ex_date": dt.date(2020, 7, 1), "kind": "dividend", "value": 1.0,
+                              "first_public_at": pd.Timestamp("2020-07-01", tz="UTC")}])
+    f = dividend_factors(_bars(), late_div, as_of=NOW)
+    assert f.iloc[-1] == 1.0
 
 
 def test_dividend_adjustment_scales_prior_prices_down():

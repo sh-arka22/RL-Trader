@@ -30,3 +30,27 @@ def unexpected_sessions(dates, start: dt.date, end: dt.date, name: str = "XNYS")
     """Bars on days the exchange was shut — a provider defect, not a bonus."""
     valid = set(sessions(start, end, name))
     return [d for d in sorted(set(dates)) if start <= d <= end and d not in valid]
+
+
+def last_complete_session(now: "pd.Timestamp | None" = None, name: str = "XNYS") -> dt.date:
+    """Most recent session whose closing print has happened.
+
+    G1 must compare against the full expected window, not against the end of whatever
+    the provider happened to return — otherwise truncating every series still reports
+    "0 missing sessions" (finding H2). But it must not demand today's bar before today's
+    close, so the expected window stops here.
+    """
+    import pandas as pd
+    now = pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now)
+    if now.tz is None:
+        now = now.tz_localize("UTC")
+    cal = _cal(name)
+    day = now.tz_convert("America/New_York").date()
+    for _ in range(10):
+        idx = cal.sessions_in_range(pd.Timestamp(day) - pd.Timedelta(days=14), pd.Timestamp(day))
+        for s in reversed([d.date() for d in idx]):
+            close = cal.session_close(pd.Timestamp(s))
+            if pd.Timestamp(close).tz_convert("UTC") <= now:
+                return s
+        day = day - dt.timedelta(days=14)
+    raise RuntimeError("no complete session found")

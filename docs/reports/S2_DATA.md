@@ -135,3 +135,65 @@ regression guard for §1.
   names — `RESEARCH.md` flags this as a headline risk.
 - **`first_public_at` = 16:00 ET ignores late consolidated-tape corrections.** Marginally
   optimistic; the environment's 1-bar execution delay absorbs it.
+
+## 8. Adversarial review and what it changed
+
+An independent reviewer (`s2-reviewer`) attacked this pipeline and filed 14 findings in
+`docs/reports/S2_REVIEW.md`: 3 critical, 3 high, 4 medium, 4 low. Its verdict is worth
+quoting, because it is the real lesson of S2:
+
+> "The arithmetic is in better shape than the gates. I attacked the split/dividend math
+> hard and it held. The exposure is that six green gates certify much less than they
+> appear to — four will not fail on a realistic instance of the failure they name, and
+> two can quietly reduce their own scope to nothing."
+
+That is the same failure mode as §1 at one level up. In §1 a real bug hid behind a
+healthy median. Here, healthy-looking gates hid the fact that they could not fail.
+
+### Fixed
+
+| ID | Defect | Evidence | Fix |
+|---|---|---|---|
+| C1 | `bars(as_of=…)` returned the latest vintage. NVDA at `as_of=2016-01-01` gave a 2015-01-02 close of 0.50325 when the tape printed 20.13 — 40x, from two splits that had not happened. Returns survive a uniform rescale, so every returns-based gate stayed green. | live store | New `Store.tape()` returns tape-correct levels (now 20.13). `bars()` docstring states plainly that it is correct for returns and wrong for levels. |
+| C2 | G3/G5 scored on `max(median_bps)` only. One 10x-corrupted bar → `max_bps` 93,138 and **PASS**. The gate built to catch the §1 bug was scored on the exact statistic that hid it. | mutation | `_score()` judges median **and** p95 **and** max **and** the fraction above 1 bp. |
+| C3 | The G5 reference fetch sat behind a bare `except`; on failure `ref_adj` stayed `{}` and `if ref_adj:` skipped the gate — "all gates passed", exit 0. The endpoint is *documented* to rate-limit. | reproduced | G5 is appended unconditionally and fails on a missing reference. |
+| H1 | `as_traded()` gated un-adjustment on `as_of`, returning split-adjusted prices for a point-in-time query: NVDA 2024-05-31 → 109.63 vs 1096.33 printed. It reproduced the very 10x error §1 warns about. | reproduced | Un-adjustment follows the data vintage, not the backtest clock. Now 1096.33. |
+| H2 | G1 truncated its own window to `min(end, max(date))`. Truncating every series at 2020-01-02 still reported "0 missing sessions" while 1,684 sessions per series were gone. | mutation | Window runs to `calendar.last_complete_session()`; the expected count is reported. |
+| M1 | G7 skipped absent tickers. Deleting NVDA → **PASS** "on 2 split anchors"; the 10:1 anchor simply vanished. | mutation | A missing anchor ticker fails the gate. |
+| M2 | No anchor sat on or after an ex-date, so flipping `<` to `<=` in `unadjust_factors` left G7 green. | analysis | Three post-split anchors added (NVDA 121.79, TSLA 296.07, AAPL 129.04). |
+| M3/L1 | `adjusted()` checked a keyword, not `bars["price_basis"]`; `store.actions()` had no provider filter, so two providers reporting one 10:1 split would give factor 100 (+90,000 bp) — triggered precisely by adding the Tiingo/Alpaca key the code advertises. | analysis | Basis is read from the data; actions are de-duplicated on `(ex_date, kind)`; `provider=` filter added. |
+| M4 | `dividend_factors` broke its own "1.0 at the last bar" contract when an action post-dated the final bar (−68.4 bp), invisible to G5 because a uniform rescale cancels in `pct_change`. | reproduced | Normalised to exactly 1.0 at the last bar. |
+| L4 | Ties on equal `recorded_at` were broken by glob order over a UUID filename — a coin flip (102/98 over 200 stores). `--repro` pins `recorded_at`, manufacturing exactly those ties. | reproduced | Sort key includes `ingest_id`. |
+| G4 | **The gate was a tautology.** `write_bars` stamps `first_public_at = date + 16:00 ET`, and the gate asked whether bars dated ≥ D are hidden at D 09:29 — testing the filter that produced the data. A store whose every bar held the *next* session's OHLC passed. It also probed only 9 of 2,942 sessions (0.3%) and never touched the actions table. | proved | Rewritten as a stamp audit over **all 29,410 bars** plus every action stamp. |
+
+### Verified by mutation, not by assertion
+
+Every gate is now run against a planted instance of the defect it names:
+
+| Planted defect | Gate | Result |
+|---|---|---|
+| truncate all series at 2020-01-02 | G1 | fails |
+| delete 5 interior sessions | G1 | fails |
+| one NVDA bar of provider 2 ×10 | G3 | fails |
+| provider 2 = exact mirror of provider 1 | G3 | fails |
+| G5 reference rate-limited to `{}` | G5 | fails |
+| NVDA removed entirely | G7 | fails |
+| one bar stamped 8 h early | G4 | fails |
+
+### Accepted, not fixed
+
+- **A2 / review answer 4** — the G5 inner join has no minimum sample size; a 2-bar overlap
+  counts as usable. Deferred to S3, where fold sizes are defined.
+- **`ambiguous=True` is dead code** in the 16:00/09:30 stamping (the DST ambiguity window
+  is 01:00–01:59). Harmless; left in place. DST was checked across the 2021, 2023 and 2024
+  transitions and is correct.
+- **Early closes (13:00 ET) are stamped 16:00** — three hours late, conservative, cannot leak.
+
+### Confirmed clean under attack
+
+The split/dividend arithmetic. Multiple splits compose correctly (NVDA 40 / 40 / 10 / 10 / 1
+across the 2021 4:1 and 2024 10:1); five random permutations of the actions frame give
+bitwise-identical output; the strict `<` at the ex-date is right on both paths; vendor
+dividend values arrive in the same split-adjusted basis as the closes, so `1 - div/prev_close`
+cancels to 0.000000 bp. DST handling, the G5 merge alignment, and `drop_duplicates` per axis
+were each attacked and held.

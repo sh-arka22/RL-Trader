@@ -6,9 +6,24 @@ Layout::
     data/actions/ticker=<T>/part-<ingest_id>.parquet
 
 Append-only. A re-ingest writes a NEW part with a new ``recorded_at``; nothing is ever
-overwritten in place. ``as_of`` queries pick the latest row per (ticker, date, provider)
-whose ``recorded_at`` and ``first_public_at`` both precede the knowledge timestamp.
-That is what makes the store bitemporal rather than merely dated.
+overwritten in place.
+
+WHAT ``as_of`` DOES AND DOES NOT GIVE YOU
+-----------------------------------------
+``as_of`` filters ``first_public_at`` only. It answers "which bars existed by then".
+It does NOT rewind the price basis, and it cannot: this store holds a single vintage,
+recorded 2026-09-14, and free providers do not serve historical vintages.
+
+So ``bars('NVDA', as_of='2016-01-01')`` returns rows recorded ten years after that
+instant, carrying closes that already embed the 2021 4:1 and 2024 10:1 splits. The
+2015-01-02 close reads 0.50325; the tape printed 20.13. Returns survive that uniform
+rescale, which is why every returns-based gate stayed green while the levels were 40x
+wrong — finding C1 of the S2 review.
+
+The rule:
+  * returns, features, reconciliation  -> ``bars()`` is correct.
+  * share counts, round lots, notional, anything quoted in dollars per share
+                                       -> use ``tape()``, never ``bars()``.
 """
 from __future__ import annotations
 import datetime as dt
@@ -125,13 +140,19 @@ class Store:
             if rb.tz is None:
                 rb = rb.tz_localize("UTC")
             df = df[df["recorded_at"] <= rb]
-        df = (df.sort_values(["ticker", "date", "provider", "recorded_at"])
+        # ingest_id breaks ties on equal recorded_at. Without it the winner is decided by
+        # glob order over part-<provider>-<uuid>.parquet, i.e. a coin flip — and --repro
+        # pins recorded_at for both runs, manufacturing exactly those ties (finding L4).
+        df = (df.sort_values(["ticker", "date", "provider", "recorded_at", "ingest_id"])
                 .drop_duplicates(["ticker", "date", "provider"], keep="last"))
         return df.reset_index(drop=True)
 
     def actions(self, ticker: str | None = None, as_of: pd.Timestamp | None = None,
-                recorded_before: pd.Timestamp | None = None) -> pd.DataFrame:
+                recorded_before: pd.Timestamp | None = None,
+                provider: str | None = None) -> pd.DataFrame:
         df = self._read("actions", ticker)
+        if provider is not None and not df.empty:
+            df = df[df["provider"] == provider]
         if df.empty:
             return pd.DataFrame(columns=["ticker", "ex_date", "kind", "value",
                                          "provider", "first_public_at", "recorded_at"])
@@ -145,9 +166,29 @@ class Store:
             if rb.tz is None:
                 rb = rb.tz_localize("UTC")
             df = df[df["recorded_at"] <= rb]
-        return (df.sort_values(["ticker", "ex_date", "kind", "recorded_at"])
+        return (df.sort_values(["ticker", "ex_date", "kind", "recorded_at", "ingest_id"])
                   .drop_duplicates(["ticker", "ex_date", "kind", "provider"], keep="last")
                   .reset_index(drop=True))
+
+    def tape(self, ticker: str, as_of: pd.Timestamp | None = None,
+             provider: str = "yahoo") -> pd.DataFrame:
+        """Bars visible at ``as_of``, with price LEVELS as actually printed.
+
+        This is the accessor a backtest must use for anything denominated in dollars per
+        share. ``traded_*`` columns are the tape; ``adj_*`` are total-return adjusted for
+        the knowledge state ``as_of``; ``close`` remains the stored split-adjusted series.
+        """
+        from .adjust import adjusted, as_traded
+        b = self.bars(ticker, provider=provider, as_of=as_of)
+        if b.empty:
+            return b
+        acts_all = self.actions(ticker, provider=provider)
+        acts_known = self.actions(ticker, as_of=as_of, provider=provider)
+        out = as_traded(b, acts_all)
+        adj = adjusted(b, acts_known, as_of=as_of or pd.Timestamp.now(tz="UTC"))
+        for c in ("adj_open", "adj_high", "adj_low", "adj_close", "adj_factor"):
+            out[c] = adj[c].to_numpy()
+        return out
 
     def duckdb(self):
         """A DuckDB connection with bars/actions registered as views over the Parquet tree."""

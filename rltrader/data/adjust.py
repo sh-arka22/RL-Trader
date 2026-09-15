@@ -35,13 +35,36 @@ SPLIT_ADJUSTED = "split_adjusted_as_of_recorded_at"
 RAW = "raw"
 
 
+def _dedupe(actions: pd.DataFrame) -> pd.DataFrame:
+    """One row per (ex_date, kind). Two providers reporting the same 10:1 split would
+    otherwise multiply to 100:1 — a +90,000 bp error that appears the moment a second
+    action source is added. Finding L1/M3 of the S2 review."""
+    if actions is None or actions.empty:
+        return actions
+    return actions.sort_values(["ex_date", "kind", "value"]).drop_duplicates(
+        subset=["ex_date", "kind"], keep="first")
+
+
 def _known(actions: pd.DataFrame, as_of: pd.Timestamp, kind: str | None = None) -> pd.DataFrame:
     if actions is None or actions.empty:
         return pd.DataFrame(columns=["ex_date", "kind", "value"])
     a = actions[pd.to_datetime(actions["first_public_at"], utc=True) <= pd.Timestamp(as_of)]
     if kind:
         a = a[a["kind"] == kind]
-    return a.sort_values("ex_date")
+    return _dedupe(a).sort_values("ex_date")
+
+
+def _vintage(actions: pd.DataFrame, kind: str | None = None) -> pd.DataFrame:
+    """Every action baked into the stored series, regardless of the backtest clock.
+
+    The basis of the stored prices is a property of ``recorded_at`` — of the VINTAGE —
+    not of the simulated present. Filtering these by ``as_of`` leaves prices that are
+    neither as-traded nor as-stored. That was finding H1.
+    """
+    if actions is None or actions.empty:
+        return pd.DataFrame(columns=["ex_date", "kind", "value"])
+    a = actions[actions["kind"] == kind] if kind else actions
+    return _dedupe(a).sort_values("ex_date")
 
 
 def dividend_factors(bars: pd.DataFrame, actions: pd.DataFrame, as_of: pd.Timestamp) -> pd.Series:
@@ -57,17 +80,28 @@ def dividend_factors(bars: pd.DataFrame, actions: pd.DataFrame, as_of: pd.Timest
         if prev <= 0:
             continue
         mult.loc[mult.index < a["ex_date"]] *= (1.0 - float(a["value"]) / prev)
-    return mult
+    # Contract: exactly 1.0 at the last bar. An action dated after the final bar would
+    # otherwise rescale the whole series (finding M4: -68.4 bp under truncated bars).
+    # A uniform rescale is invisible to any returns-based check, so it is normalised here.
+    last = float(mult.iloc[-1]) if len(mult) else 1.0
+    return mult / last if last not in (0.0, 1.0) else mult
 
 
-def unadjust_factors(bars: pd.DataFrame, actions: pd.DataFrame, as_of: pd.Timestamp) -> pd.Series:
+def unadjust_factors(bars: pd.DataFrame, actions: pd.DataFrame,
+                     as_of: pd.Timestamp | None = None) -> pd.Series:
     """Multiplier that turns the stored split-adjusted series back into printed prices.
 
     price_as_traded(t) = price_stored(t) * prod(ratio for every split with ex_date > t)
+
+    ``as_of`` is accepted and IGNORED, deliberately. Un-adjustment reverses what the
+    vendor baked in, and the vendor bakes in every split up to ``recorded_at``. Gating it
+    on the backtest clock (the original behaviour) returned 109.63 for NVDA 2024-05-31 at
+    as_of=2024-06-01 when the tape printed 1096.33 — the exact 10x position-sizing error
+    this module exists to prevent. Finding H1.
     """
     b = bars.sort_values("date").reset_index(drop=True)
     mult = pd.Series(1.0, index=b["date"].values, dtype="float64")
-    for _, a in _known(actions, as_of, "split").iterrows():
+    for _, a in _vintage(actions, "split").iterrows():
         r = float(a["value"])
         if r > 0:
             mult.loc[mult.index < a["ex_date"]] *= r
@@ -78,6 +112,12 @@ def adjusted(bars: pd.DataFrame, actions: pd.DataFrame, as_of: pd.Timestamp,
              include_dividends: bool = True, price_basis: str = SPLIT_ADJUSTED) -> pd.DataFrame:
     """Total-return series for a given knowledge state. Splits are NOT re-applied."""
     b = bars.sort_values("date").reset_index(drop=True).copy()
+    # Trust the data over the argument: a raw-stamped row must not be dividend-adjusted as
+    # if it were split-adjusted just because the caller left the default (finding M3).
+    if "price_basis" in b.columns and len(b):
+        stamped = set(b["price_basis"].dropna().unique())
+        if stamped and stamped != {SPLIT_ADJUSTED}:
+            raise NotImplementedError(f"unsupported price_basis in data: {sorted(stamped)}")
     if price_basis == RAW:
         raise NotImplementedError(
             "no raw-price provider is configured; add Alpaca (adjustment='raw') or Tiingo")
@@ -91,7 +131,8 @@ def adjusted(bars: pd.DataFrame, actions: pd.DataFrame, as_of: pd.Timestamp,
     return b
 
 
-def as_traded(bars: pd.DataFrame, actions: pd.DataFrame, as_of: pd.Timestamp) -> pd.DataFrame:
+def as_traded(bars: pd.DataFrame, actions: pd.DataFrame,
+              as_of: pd.Timestamp | None = None) -> pd.DataFrame:
     """Prices as actually printed on the day. For share counts and round lots, not returns."""
     b = bars.sort_values("date").reset_index(drop=True).copy()
     u = unadjust_factors(b, actions, as_of).reindex(b["date"].values).to_numpy()
