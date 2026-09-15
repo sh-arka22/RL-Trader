@@ -56,6 +56,15 @@ must **measure its own**, and the measurement apparatus matters more than the ag
 |---|---|
 | SPY buy-and-hold | **0.82** |
 | Equal-weight 5 large caps (AAPL/MSFT/JNJ/JPM/XOM) | **1.07** |
+
+> **CORRECTION (S3, 2026-09-14).** The 1.07 above is for the *retired* basket
+> AAPL/MSFT/JNJ/JPM/XOM, daily-rebalanced (reproduced at 1.073). The universe actually
+> traded is NVDA/TSLA/AAPL/META/XOM, whose passive bar is **1.201** buy-and-hold /
+> **1.234** daily-rebalanced over the same window. The hurdle is ~0.13 Sharpe higher than
+> planned. The bar is now computed from the store by `tests/test_baselines.py` and pinned
+> in `rltrader/eval/bar.py`; do not copy it from prose. See that module for the full
+> convention table — the spread between conventions is 0.35 Sharpe, larger than most
+> improvements claimed in the literature surveyed here.
 | Realistic net-of-cost range for an RL agent on 5 daily-bar large caps | **0.0 – 0.6** |
 
 Read that honestly: **the passive benchmark is expected to win.** A credible outcome for this
