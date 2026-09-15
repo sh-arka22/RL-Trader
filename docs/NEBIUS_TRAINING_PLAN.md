@@ -79,21 +79,29 @@ nebius profile active
 Tell me when this is done, or hand me a service-account credentials JSON (Nebius console → IAM →
 Service Accounts → new key) and I can take it from here instead.
 
-### Step 2 — check availability and provision a CPU-only VM (either of us can run this once profile exists)
+### Step 2 — provision a CPU-only VM (either of us can run this once profile exists)
+
+**Correction, checked 2026-09-15**: `nebius compute instance create --help` doesn't need an
+authenticated profile to inspect, so I checked it directly. My first draft of this command was
+wrong — the CLI needs `--resources-platform`, `--resources-preset`, `--parent-id`,
+`--network-interfaces`, and `--boot-disk-attach-mode` as required flags, several with deeply
+nested sub-options (e.g. `--boot-disk-managed-disk-source-image-family-image-family`,
+`--boot-disk-managed-disk-size-gibibytes`). Hand-crafting all of that correctly by flag is
+error-prone for a one-off VM.
+
+**Recommended instead**: the CLI's own interactive wizard, which asks for each value one at a
+time and is far less likely to produce a malformed request:
 ```bash
-nebius compute platform list                       # confirm cpu-d3 / cpu-e2 availability in your region
-nebius compute instance create \
-  --name rl-trader-train \
-  --platform cpu-e2 \
-  --preset 8vcpu-32gb \
-  --boot-disk-image-family ubuntu22.04-driverless \
-  --boot-disk-size 50 \
-  --network-id <your-network-id>
+nebius compute instance create --interactive
 ```
-(Exact flags for network/subnet depend on your project's defaults — `nebius compute instance
-create --help` will show what's required if this errors; I have not test-run this specific
-command since it needs an authenticated profile.) Cost at $0.10–0.20/hr for an 8 vCPU/32 GB node:
-running for a full 8-hour day is **under $2**.
+Answer: platform `cpu-e2` (Intel Ice Lake, from $0.05/hr) or `cpu-d3` (AMD EPYC Genoa, from
+$0.10/hr), preset around `8vcpu-32gb` for a parallel HPO sweep, a small boot disk (30–50 GB is
+plenty — this project's own data footprint is ~21 MB), and your default network/subnet when
+prompted. **The Nebius web console** (`app` side of `nebius.com`, once logged in) is an equally
+valid and arguably easier path for this one-off step if you'd rather click through it visually —
+either way, once the instance exists, everything from Step 3 onward is identical.
+
+Cost at $0.10–0.20/hr for an 8 vCPU/32 GB node: running for a full 8-hour day is **under $2**.
 
 ### Step 3 — set up the environment on the VM
 ```bash
