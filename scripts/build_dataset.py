@@ -71,7 +71,10 @@ def main() -> int:
         print(f"{'PASS' if g.passed else 'FAIL'}  {g.name:24s} {g.detail}")
     print("=" * 78)
 
-    write_manifest(a.root, pathlib.Path(a.root) / "manifest.json",
+    # A full build writes the manifest (the receipt). A check-only run writes a separate
+    # report, so `make check` does not dirty the tree on every invocation (finding L7).
+    out_name = "gate_report.json" if a.check_only else "manifest.json"
+    write_manifest(a.root, pathlib.Path(a.root) / out_name,
                    extra={"tickers": a.tickers, "start": str(start), "end": str(end),
                           "payload_digest": payload_digest(a.root),
                           "gates": [{"name": g.name, "passed": g.passed, "detail": g.detail,

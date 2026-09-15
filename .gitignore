@@ -2,9 +2,12 @@ __pycache__/
 *.pyc
 .venv/
 .env
-/data/                 # dataset artefacts at repo root ONLY.
-                       # NOT bare `data/` — that also matches rltrader/data/ (the source
-                       # package) and silently excludes it from git. Caught by graft, 2026-09-14.
+# Dataset artefacts at the repo ROOT only. Two traps, both hit on 2026-09-14:
+#  1. bare `data/` also matches rltrader/data/ — the SOURCE package — and silently
+#     excludes the implementation from git. Caught by graft.
+#  2. .gitignore has NO inline comments. `/data/   # note` is a literal pattern that
+#     matches nothing, so 131 Parquet files were committed. Comments get their own line.
+/data/
 wandb/
 .DS_Store
 *.ipynb_checkpoints
