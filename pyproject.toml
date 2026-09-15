@@ -17,6 +17,7 @@ dependencies = [
     "stable-baselines3>=2.4",
     "sb3-contrib>=2.4",
     "torch>=2.4",
+    "optuna>=4.0",
 ]
 
 [project.optional-dependencies]
