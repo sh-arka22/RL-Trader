@@ -13,6 +13,10 @@ dependencies = [
     "exchange_calendars>=4.6",
     "requests>=2.32",
     "tyro>=0.9",
+    "gymnasium>=1.0",
+    "stable-baselines3>=2.4",
+    "sb3-contrib>=2.4",
+    "torch>=2.4",
 ]
 
 [project.optional-dependencies]
