@@ -190,6 +190,14 @@ Built **first**, before any agent.
   meaningless without the true trial count.
 - Evaluation universes: the traded 5 **plus** random / momentum / volatility-selected universes
   **including delisted names**, because hand-picked survivor baskets inflate results.
+- **Costs must be trained-into, not overlaid.** Confirmed 2026-09-15 (S3, FinRL replication):
+  a cost-aware policy trained at 0 bps and one trained at 10 bps are *different policies*, not
+  the same policy priced two ways — one seed scored *worse* at 0 bps than at 10 bps, i.e. cost
+  sensitivity is path-dependent once the agent can react to fees. A rule-based, cost-agnostic
+  baseline (equal-weight, momentum) can have three cost levels overlaid onto one recorded
+  trajectory exactly, because its weights never depend on realised fees. An RL agent cannot:
+  it must be **retrained separately at each of the three cost levels**, never trained once at
+  one level and re-costed after the fact. Budget S4/S5 compute accordingly (3x the runs).
 
 ### 3.7 UI
 

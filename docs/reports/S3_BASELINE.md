@@ -130,7 +130,62 @@ correction** — the headline result of this stage:
 
 ## 6. FinRL PPO comparison point
 
-See `docs/reports/S3_FINRL.md` (companion report). Independent worker, isolated venv.
+See `docs/reports/S3_FINRL.md` (654 lines, independent worker, isolated venv, pinned SHA
+`2334a5fe6d30629157f13c3b0319e1637e15e123`, clean tree, zero patches).
+
+**Headline: FinRL PPO does not beat equal-weight buy-and-hold on our universe.**
+
+| | Sharpe | Cum. return |
+|---|---|---|
+| FinRL PPO, defaults, 10 bps, 5 seeds (mean ± std) | **0.858 ± 0.159** (range 0.747–1.113) | +156.0% |
+| Equal-weight buy-and-hold, same 5 names | **0.976** | +201.3% |
+| SPY | 0.735 | — |
+| DJIA | 0.589 | — |
+
+Only 1 of 5 seeds beats equal-weight. Return correlation to EW-5 is 0.48–0.88 and mean
+invested fraction reaches ~100% from 2023 on — the trained policy is close to a static
+long-only book, i.e. mostly beta, not evidence of a control edge.
+
+**A claim I made in an earlier status update was wrong and is corrected here.** I stated
+that FinRL's environment "does not deduct the transaction cost it is configured with"
+based on `env_total_cost_usd=0` / `env_total_trades=0` in a raw results file. The worker
+falsified this directly: those counters are zeroed by `reset()`, and SB3's `DummyVecEnv`
+auto-resets on episode end, so reading them after rollout always shows zero regardless of
+whether costs were charged. A fixed action tape read *before* reset shows the fee scaling
+correctly (0 bps → $0 cost; 10 bps → $59,624; 100 bps → $570,587, on a $1.65M book).
+**FinRL does deduct its configured cost.** The reason 10 bps looked nearly free in the
+default run is real but different: `hmax=100` (a per-asset daily share cap) holds turnover
+to 0.2–0.9×/yr regardless of cost, so 10 bps costs only ~13 bps/yr against 16–52% annual
+volatility — the cost is genuinely small at that turnover, not absent. Raising `hmax` to
+1000 lifts turnover to 10.9–20.4×/yr and the cost gap appears immediately (Sharpe 0.522
+vs 0.568). This is a lesson about verifying an instrumentation claim before publishing it,
+not about FinRL.
+
+**Confirmed cost assumption, read from source, not the README**: 0.001 (10 bps) **per
+side**, proportional to notional, hard-coded across ten call sites in FinRL's own
+examples; `env_stocktrading.py` itself has no default. Two sibling environments in the
+same repo default to 30 bps. The model has no spread, slippage, market impact, partial
+fills, shorting, or borrow cost, and fills at the **observed close** — the same same-bar
+fill defect `RESEARCH.md` §1 rejected TensorTrade for.
+
+**Other flags from the report, most consequential first**: `DOW_30_TICKER` is the *2026*
+index membership (AMZN, NVDA, SHW, CRM) backtested from 2014 — survivorship bias baked
+into FinRL's own flagship demo; `clean_data` drops tickers over the full train+test span
+before the split, which can leak a delisting/relisting pattern; the test environment
+starts 100% cash while train does not, and a VIX turbulence gate is applied only at test
+time — a train/test asymmetry; 100k training steps scored *worse* than 20k (0.642 vs
+0.858), i.e. more compute made the result worse, not better.
+
+**Design consequence for S4, recorded now**: FinRL's PPO is cost-aware during training —
+its reward includes the fee, so training at 0 bps and training at 10 bps produce
+*different policies*, not the same policy priced two ways. Costs are therefore
+**path-dependent for any strategy that can react to them** (the worker found one seed
+that scored worse at 0 bps than at 10 bps). Our current baselines are cost-*agnostic* —
+`weights()` depends only on price history, never on realised fees — so overlaying three
+cost levels onto one recorded trajectory (`harness.evaluate`) is exact for them. It will
+stop being exact the moment an RL agent is introduced: **the agent must be retrained
+separately at each cost level**, never trained once and cost-overlaid after the fact.
+This is now recorded as an explicit constraint for S4/S5 (see `ARCHITECTURE.md`).
 
 ## 7. Honest gaps
 
