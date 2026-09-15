@@ -16,7 +16,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3", "pytest-xdist>=3.6"]
+dev = [
+    "pytest>=8.3",
+    "pytest-xdist>=3.6",
+    # Ground-truth oracles for tests/test_stats.py ONLY. rltrader/eval/stats.py
+    # deliberately imports nothing beyond numpy + the stdlib, so the test suite can
+    # check its special functions and HAC variances against an independent
+    # implementation instead of against itself.
+    "scipy>=1.14",
+    "statsmodels>=0.14",
+]
 
 [build-system]
 requires = ["hatchling"]
