@@ -37,11 +37,18 @@ class BuyAndHoldFirst:
 
 
 class Momentum:
-    """Long the top-k names by trailing return. A real, cheap, honest baseline."""
-    name = "momentum_60d_top2"
+    """Long the top-k names by trailing return. A real, cheap, honest baseline.
+
+    ``name`` encodes the parameters. A class-level constant name (the original bug: every
+    lookback/top_k combination shared "momentum_60d_top2") makes six distinct trials
+    collide into one key wherever results are indexed by name — including in the trial
+    log and in any dict keyed on strategy.name — silently discarding 4 of 6 trials from
+    a PBO or DSR count that must be exact to mean anything.
+    """
 
     def __init__(self, n: int, lookback: int = 60, top_k: int = 2):
         self.n, self.lookback, self.top_k = n, lookback, top_k
+        self.name = f"momentum_{lookback}d_top{top_k}"
 
     def fit(self, train: pd.DataFrame) -> None:
         pass

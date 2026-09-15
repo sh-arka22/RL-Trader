@@ -549,6 +549,10 @@ def expected_max_sharpe(n_trials: int, trial_sharpe_std: float) -> float:
     This grows without bound in ``N``: 100 trials of noise produce an expected best Sharpe
     of about :math:`2.5\sqrt{V}`, 10,000 trials about :math:`3.9\sqrt{V}`.  That is the
     whole argument for keeping an immutable trial log (PLAN.md S3).
+
+    Their eq. (1) carries a leading :math:`E[\widehat{SR}_n]` term; the DSR drops it
+    because the null is that every trial has a true Sharpe of zero ("Under the null
+    hypothesis that the actual Sharpe ratio is zero, :math:`E[\widehat{SR}_n]=0`", p. 9).
     """
     if n_trials < 1:
         raise ValueError(f"n_trials must be >= 1, got {n_trials}")
@@ -629,6 +633,16 @@ def deflated_sharpe_ratio(sharpe: float, n_trials: int, skew: float, kurtosis: f
         Probability in [0, 1] that the true Sharpe exceeds what selection bias alone
         would deliver.  Above 0.95 the result clears the project's deflation gate — which
         says nothing whatsoever about leakage.
+
+    Notes
+    -----
+    The paper's own numerical example (pp. 9-10) is the known-answer test used in
+    ``tests/test_stats.py``: annualised ``SR = 2.5`` over ``T = 1250`` daily observations
+    (250/yr), ``V[SR_n] = 1/2`` annualised, ``skew = -3``, ``kurtosis = 10`` gives
+    ``SR_0 ~ 0.1132`` per observation and ``DSR = 0.9004`` at ``N = 100``, rising to
+    ``0.9505`` at ``N = 46`` — and ``0.9505`` at ``N = 88`` if the same Sharpe had come
+    from Normal returns.  Fat left tails cost this strategy 42 trials' worth of
+    credibility.
     """
     if n_trials < 1:
         raise ValueError(f"n_trials must be >= 1, got {n_trials}")
@@ -698,8 +712,11 @@ def probability_of_backtest_overfitting(matrix_of_trial_returns, n_splits: int =
     5.  Compute its **relative rank** among all ``N`` trials out of sample,
         :math:`\omega_c = \mathrm{rank}(n^*) / (N+1) \in (0,1)`, and the logit
         :math:`\lambda_c = \log\frac{\omega_c}{1-\omega_c}`.
-    6.  :math:`PBO = P(\lambda \le 0)` — the fraction of splits in which the in-sample
-        best strategy lands **below the out-of-sample median**.
+    6.  :math:`PBO = \int_{-\infty}^{0} f(\lambda)\,d\lambda` — the fraction of splits in
+        which the in-sample best strategy lands **below the out-of-sample median**.
+        Strictly below: a selected trial sitting exactly at the median
+        (:math:`\omega = 1/2`, possible only when ``N`` is odd) is not counted as
+        overfit.  The paper does not state a tie convention.
 
     Interpretation.  ``PBO ~ 0.5`` means the selection procedure has no skill: the winner
     of the search is a coin flip out of sample.  That is the *expected* value when all
@@ -710,7 +727,9 @@ def probability_of_backtest_overfitting(matrix_of_trial_returns, n_splits: int =
 
     Like the DSR, this measures **overfitting by search**.  It does not and cannot detect
     look-ahead leakage: a leaked column wins in sample *and* out of sample, so its CSCV
-    rank is top and its PBO is ~0.
+    rank is top and its PBO is ~0.  The paper's own decision rule is "reject models for
+    which PBO is estimated to be greater than 0.05" (p. 14), which is a statement about
+    search, not about data hygiene.
 
     Parameters
     ----------
@@ -718,9 +737,15 @@ def probability_of_backtest_overfitting(matrix_of_trial_returns, n_splits: int =
         Per-period returns, rows = time (chronological), columns = trials.  The trailing
         ``T mod n_splits`` rows are dropped so that the blocks are of equal length.
     n_splits : int
-        ``S``, the number of submatrices.  Must be even and at least 4.  The number of
-        CSCV combinations is ``comb(S, S/2)``: 252 at S=10, 12,870 at S=16, 184,756 at
-        S=20.
+        ``S``, the number of submatrices.  Must be even and at least 4.  The paper
+        recommends 16 ("if M contains 4 years of daily data, S = 16 would equate to
+        quarterly partitions, and the serial correlation structure would be preserved ...
+        we believe that S = 16 is a reasonable value to use in most cases", p. 22).  The
+        number of CSCV combinations is ``comb(S, S/2)``: 6 at S=4, 924 at S=12,
+        **12,870** at S=16, 2,704,156 at S=24.  Note the published paper prints "12,780"
+        for the S=16 case on both p. 11 and p. 22; that is a digit transposition —
+        ``comb(16, 8) = 12870``, and every other count it prints is correct.  The test
+        suite asserts 12,870.
     performance : callable or None
         ``f(block) -> array of length N`` scoring each column of a ``(rows, N)`` slice.
         ``None`` (default) uses the per-observation Sharpe ratio ``mean/std`` with the
@@ -792,7 +817,7 @@ def probability_of_backtest_overfitting(matrix_of_trial_returns, n_splits: int =
     rank = lower + 0.5 * (equal + 1.0)
     omega = rank / (n_trials + 1.0)
     logits = np.log(omega / (1.0 - omega))
-    pbo = float(np.mean(logits <= 0.0))
+    pbo = float(np.mean(logits < 0.0))
 
     is_star = is_perf[rows, best]
     slope = float("nan")
@@ -1070,21 +1095,38 @@ def stationary_bootstrap(x, block_size: float, n_boot: int, rng=None) -> np.ndar
 def stationary_bootstrap_variance(x, block_size: float) -> float:
     r"""Exact variance of the stationary-bootstrap sample mean, Politis & Romano (1994).
 
-    For the circular scheme above, :math:`E^*[\bar x^*] = \bar x` exactly and
+    Politis, D. N. & Romano, J. P. (1994), *JASA* 89(428):1303-1313, the variance of the
+    bootstrap mean under the stationary (circular, geometric-block) scheme:
 
     .. math::
 
-        \mathrm{Var}^*(\sqrt{n}\,\bar x^*) = \tilde R(0)
-            + 2\sum_{k=1}^{n-1} b_n(k)\,\tilde R(k),
+        \mathrm{Var}^*\!\big(\sqrt{n}\,\bar x^*\big) = \hat R(0)
+            + 2\sum_{k=1}^{n-1} b_n(k)\,\hat R(k),
         \qquad
-        b_n(k) = \Big(1-\frac{k}{n}\Big)(1-p)^k + \frac{k}{n}(1-p)^{n-k}
+        b_n(k) = \frac{n-k}{n}(1-p)^k + \frac{k}{n}(1-p)^{n-k}
 
-    where :math:`\tilde R(k) = n^{-1}\sum_{i=1}^{n}(x_i-\bar x)(x_{i+k}-\bar x)` is the
-    **circular** autocovariance (indices wrap).  This is the population variance of the
-    resampling distribution, so simulating :func:`stationary_bootstrap` must converge to
-    it — the test suite uses that as a known-answer check on the sampler itself.
+    with :math:`p = 1/b` and the **ordinary (non-circular)** autocovariance
+    :math:`\hat R(k) = n^{-1}\sum_{i=1}^{n-k}(x_i-\bar x)(x_{i+k}-\bar x)`.  The second
+    weight term is what accounts for the wrap-around: the pairs that straddle the end of
+    the sample are at circular lag ``k`` but ordinary lag ``n-k``.
 
-    Returns the variance of :math:`\bar x^*` (not of :math:`\sqrt n \bar x^*`).
+    Equivalently, in terms of the **circular** autocovariance
+    :math:`\tilde R(k) = \hat R(k) + \hat R(n-k)`,
+
+    .. math::
+
+        \mathrm{Var}^*\!\big(\sqrt{n}\,\bar x^*\big)
+            = \tilde R(0) + 2\sum_{k=1}^{n-1}\Big(1-\frac kn\Big)(1-p)^k\,\tilde R(k)
+
+    which follows directly from :math:`\mathrm{Cov}^*(x^*_t, x^*_{t+k}) = (1-p)^k\tilde R(k)`
+    — the two series stay in lock-step only while no geometric jump occurs.  Mixing the
+    two conventions (published weights with circular autocovariances) double-counts the
+    wrap term and inflates the variance by up to a factor of two; the test suite checks
+    both forms against each other *and* against a simulated resampling distribution, so
+    that mistake cannot survive.
+
+    Returns the variance of :math:`\bar x^*` itself (i.e. the expression above divided by
+    ``n``), which is what a confidence interval for the mean needs.
     """
     arr = _as_1d(x, "x")
     n = arr.size
@@ -1092,12 +1134,10 @@ def stationary_bootstrap_variance(x, block_size: float) -> float:
         raise ValueError(f"block_size must be >= 1, got {block_size}")
     p = 1.0 / float(block_size)
     dev = arr - arr.mean()
-    # circular autocovariances via the wrapped product
-    r = np.array([float(dev @ np.roll(dev, -k)) / n for k in range(n)])
+    r_hat = np.array([float(dev[k:] @ dev[: n - k]) / n for k in range(n)])
     k = np.arange(1, n)
-    w = (1.0 - k / n) * (1.0 - p) ** k + (k / n) * (1.0 - p) ** (n - k)
-    total = r[0] + 2.0 * float(np.sum(w * r[1:]))
-    return total / n
+    w = ((n - k) / n) * (1.0 - p) ** k + (k / n) * (1.0 - p) ** (n - k)
+    return float(r_hat[0] + 2.0 * float(np.sum(w * r_hat[1:]))) / n
 
 
 def stationary_bootstrap_ci(x, statistic, block_size: float, n_boot: int = 1000,
